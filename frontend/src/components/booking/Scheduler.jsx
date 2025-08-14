@@ -10,7 +10,8 @@ import {
   CircularProgress,
   Tooltip,
   Alert,
-  Chip
+  Chip,
+  useTheme
 } from '@mui/material';
 import { CalendarToday, AccessTime, Info } from '@mui/icons-material';
 import { format, startOfDay, addDays, isSameDay } from 'date-fns';
@@ -23,6 +24,7 @@ export default function Scheduler({
   onDateTimeSelect,
   therapistId
 }) {
+  const theme = useTheme();
   const today = startOfDay(new Date());
   const [selectedDate, setSelectedDate] = useState(selectedDateTime?.date || today);
   const [availableSlots, setAvailableSlots] = useState([]);
@@ -50,7 +52,6 @@ export default function Scheduler({
           serviceOptionId
         };
         if (therapistId) params.therapistId = therapistId;
-        if (therapistId) params.therapistId = therapistId;
 
         const response = await apiClient.get(`/services/${serviceId}/availability/slots`, {
           params
@@ -60,22 +61,35 @@ export default function Scheduler({
           setFullyBooked(true);
         }
 
-        setAvailableSlots(response.data);
-        if (!response.data.some(slot => slot.time === selectedSlot)) {
+        // Deduplicate slots by time, keeping the one with higher remaining count
+        const deduplicatedSlots = response.data.reduce((acc, slot) => {
+          const existingSlot = acc.find(s => s.time === slot.time);
+          if (!existingSlot) {
+            acc.push(slot);
+          } else if (slot.remaining > existingSlot.remaining) {
+            // Replace with slot that has more remaining spots
+            const index = acc.indexOf(existingSlot);
+            acc[index] = slot;
+          }
+          return acc;
+        }, []);
+
+        setAvailableSlots(deduplicatedSlots);
+        if (!deduplicatedSlots.some(slot => slot.time === selectedSlot)) {
           setSelectedSlot(null);
-          onDateTimeSelect({ date: selectedDate, time: null });
+          onDateTimeSelect({ date: format(selectedDate, 'yyyy-MM-dd'), time: null });
         }
       } catch (err) {
         setError('Failed to load available slots.');
         setAvailableSlots([]);
         setSelectedSlot(null);
-        onDateTimeSelect({ date: selectedDate, time: null });
+        onDateTimeSelect({ date: format(selectedDate, 'yyyy-MM-dd'), time: null });
       } finally {
         setLoadingSlots(false);
       }
     }
     fetchSlots();
-  }, [selectedDate, serviceId, serviceOptionId, therapistId]);
+  }, [selectedDate, serviceId, serviceOptionId, therapistId, selectedSlot, onDateTimeSelect]);
 
   const handleDateChange = (e) => {
     const newDate = new Date(e.target.value);
@@ -83,7 +97,6 @@ export default function Scheduler({
     setSelectedDate(newDate);
     setSelectedSlot(null);
     onDateTimeSelect({ date: format(newDate, 'yyyy-MM-dd'), time: null });
-
   };
 
   const handleSlotSelect = (slot) => {
@@ -99,52 +112,90 @@ export default function Scheduler({
   };
 
   return (
-    <Paper elevation={0} sx={{ p: 3, border: '1px solid #e0e0e0' }}>
+    <Paper 
+      elevation={0} 
+      sx={{ 
+        p: 3, 
+        border: '1px solid', 
+        borderColor: theme.palette.divider,
+        backgroundColor: theme.palette.background.paper,
+        borderRadius: 2
+      }}
+    >
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
         <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
           <CalendarToday />
         </Avatar>
-        <Typography variant="h6">Select Date</Typography>
+        <Typography variant="h6" color="text.primary">
+          Select Date
+        </Typography>
       </Box>
+      
       <input
         type="date"
         value={format(selectedDate, 'yyyy-MM-dd')}
         onChange={handleDateChange}
         min={format(today, 'yyyy-MM-dd')}
-        style={{ padding: '8px', fontSize: '1rem', marginBottom: '16px' }}
+        style={{ 
+          padding: '12px', 
+          fontSize: '1rem', 
+          marginBottom: '16px',
+          borderRadius: '8px',
+          border: `1px solid ${theme.palette.divider}`,
+          backgroundColor: theme.palette.background.paper,
+          color: theme.palette.text.primary,
+          fontFamily: theme.typography.fontFamily,
+          width: '100%',
+          maxWidth: '200px'
+        }}
       />
-      <Divider sx={{ mb: 3 }} />
+      
+      <Divider sx={{ mb: 3, borderColor: theme.palette.divider }} />
+      
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
         <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
           <AccessTime />
         </Avatar>
-        <Typography variant="h6">
+        <Typography variant="h6" color="text.primary">
           Available Slots for {format(selectedDate, 'EEEE, MMMM do')}
         </Typography>
       </Box>
 
       {loadingSlots ? (
-        <CircularProgress />
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
       ) : error ? (
-        <Typography color="error">{error}</Typography>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
       ) : fullyBooked ? (
         <Box sx={{ textAlign: 'center', mt: 2 }}>
           <Alert severity="info" sx={{ mb: 2 }}>
-            Please contact our support team for further enquiries.
+            No available slots for this date. Please contact our support team for further enquiries.
           </Alert>
           <Button
             variant="outlined"
             onClick={handleNextDay}
+            sx={{
+              borderColor: theme.palette.primary.main,
+              color: theme.palette.primary.main,
+              '&:hover': {
+                borderColor: theme.palette.primary.dark,
+                backgroundColor: theme.palette.primary.main,
+                color: theme.palette.primary.contrastText
+              }
+            }}
           >
             Check Next Day
           </Button>
         </Box>
       ) : availableSlots.length > 0 ? (
         <Grid container spacing={1}>
-          {availableSlots.map((slot) => (
+          {availableSlots.map((slot, index) => (
             <Grid
               item
-              key={slot.time}
+              key={`${slot.time}-${index}`}
               xs={6}    // Takes half width (2 columns) on extra small screens
               sm={4}     // Takes 1/3 width on small screens (tablets)
               md={3}     // Takes 1/4 width on medium screens
@@ -164,9 +215,25 @@ export default function Scheduler({
                     sx={{
                       position: 'relative',
                       opacity: slot.remaining === 0 ? 0.6 : 1,
+                      backgroundColor: selectedSlot === slot.time 
+                        ? theme.palette.primary.main 
+                        : 'transparent',
+                      color: selectedSlot === slot.time 
+                        ? theme.palette.primary.contrastText 
+                        : theme.palette.text.primary,
+                      borderColor: selectedSlot === slot.time 
+                        ? theme.palette.primary.main 
+                        : theme.palette.divider,
+                      '&:hover': {
+                        backgroundColor: selectedSlot === slot.time 
+                          ? theme.palette.primary.dark 
+                          : theme.palette.action.hover,
+                        borderColor: theme.palette.primary.main,
+                      },
                       '&:disabled': {
-                        color: 'text.disabled',
-                        borderColor: 'text.disabled',
+                        color: theme.palette.text.disabled,
+                        borderColor: theme.palette.text.disabled,
+                        backgroundColor: 'transparent'
                       },
                       width: {
                         xs: '100%',  // Full width of the grid item on mobile
@@ -183,13 +250,19 @@ export default function Scheduler({
                           ml: {xs: 0.5, sm: 1},
                           fontSize: '0.6rem',
                           height: '16px',
-                          backgroundColor: 'success.light',
-                          color: 'white'
+                          backgroundColor: theme.palette.success.light,
+                          color: theme.palette.success.contrastText
                         }}
                       />
                     )}
                     {slot.remaining === 0 && (
-                      <Info color="disabled" sx={{ ml: 0.5, fontSize: {xs: '0.875rem', sm: '1rem'} }} />
+                      <Info 
+                        sx={{ 
+                          ml: 0.5, 
+                          fontSize: {xs: '0.875rem', sm: '1rem'},
+                          color: theme.palette.text.disabled
+                        }} 
+                      />
                     )}
                   </Button>
                 </span>
@@ -199,7 +272,9 @@ export default function Scheduler({
         </Grid>
       ) : (
         <Box sx={{ textAlign: 'center', mt: 2 }}>
-          <Typography>No available slots for this date.</Typography>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            No available slots for this date.
+          </Alert>
           <Button
             variant="outlined"
             sx={{ mt: 2 }}

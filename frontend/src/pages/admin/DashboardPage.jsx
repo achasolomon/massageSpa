@@ -8,6 +8,7 @@ import {
   SentimentVerySatisfied, Notifications, Phone, Email
 } from "@mui/icons-material";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { styled } from '@mui/material/styles';
 import apiclient from "../../services/apiClient";
 import useAuth from "../../hooks/useAuth";
 
@@ -15,36 +16,50 @@ import useAuth from "../../hooks/useAuth";
 const UPCOMING_LIMIT = 4;
 const THERAPIST_LIMIT = 6;
 
+// Styled Analytics Card Container
+const AnalyticsCardContainer = styled(Box)(({ theme }) => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+  gap: theme.spacing(3),
+  marginBottom: theme.spacing(4),
+  [theme.breakpoints.up('sm')]: {
+    gridTemplateColumns: 'repeat(2, 1fr)',
+  },
+  [theme.breakpoints.up('md')]: {
+    gridTemplateColumns: 'repeat(4, 1fr)',
+  },
+}));
+
 const StatCard = ({ title, value, change, icon, color }) => {
   const isPositive = Number(change) >= 0;
   return (
     <Card sx={{
       height: '100%',
       backgroundColor: 'background.paper',
-      borderRadius: 2,
+      borderRadius: 3,
       boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.05)',
-      transition: 'transform 0.2s, box-shadow 0.2s',
+      transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
       '&:hover': {
-        transform: 'translateY(-4px)',
+        transform: 'translateY(-2px)',
         boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)'
       }
     }}>
-      <CardContent sx={{ p: 2.5 }}>
+      <CardContent sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Avatar sx={{
             bgcolor: alpha(color, 0.1),
             color: color,
-            width: 44,
-            height: 44,
+            width: 48,
+            height: 48,
             borderRadius: 2
           }}>
             {icon}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, fontSize: '0.875rem' }}>
               {title}
             </Typography>
-            <Typography variant="h5" fontWeight={600}>
+            <Typography variant="h5" fontWeight={700}>
               {value}
             </Typography>
           </Box>
@@ -309,11 +324,9 @@ export default function DashboardPage() {
         </IconButton> */}
       </Box>
 
-      {/* 1. Summary Cards */}
-      
-      <Grid container spacing={3} sx={{ mb: 4, justifyContent: "space-between" }}>
-         {(isAdmin || isStaff) && ( 
-        <Grid item xs={12} sm={12}>
+      {/* Summary Cards - Fixed Layout */}
+      <AnalyticsCardContainer>
+        {(isAdmin || isStaff) && (
           <StatCard
             title="Today's Sessions"
             value={dashboard.todaySessions}
@@ -321,56 +334,47 @@ export default function DashboardPage() {
             icon={<CalendarToday />}
             color={theme.palette.primary.main}
           />
-        </Grid>
-      )}
+        )}
         {(isAdmin || isStaff) && (
-          <Grid item xs={12} sm={12}>
-            <StatCard
-              title="Revenue"
-              value={`$${Number(dashboard.revenue).toLocaleString()}`}
-              change={dashboard.revenueChange}
-              icon={<MonetizationOn />}
-              color={theme.palette.success.main}
-            />
-          </Grid>
+          <StatCard
+            title="Revenue"
+            value={`$${Number(dashboard.revenue).toLocaleString()}`}
+            change={dashboard.revenueChange}
+            icon={<MonetizationOn />}
+            color={theme.palette.success.main}
+          />
         )}
         {isAdmin && (
-          <>
-            <Grid item xs={12} sm={12}>
-              <StatCard
-                title="Client Retention"
-                value={`${dashboard.retentionRate}%`}
-                change={dashboard.retentionChange}
-                icon={<Group />}
-                color={theme.palette.info.main}
-              />
-            </Grid>
-            <Grid item xs={12} sm={12}>
-              <StatCard
-                title="Therapist Utilization"
-                value={`${dashboard.utilizationRate}%`}
-                change={dashboard.utilizationChange}
-                icon={<Spa />}
-                color={theme.palette.warning.main}
-              />
-            </Grid>
-          </>
+          <StatCard
+            title="Client Retention"
+            value={`${dashboard.retentionRate}%`}
+            change={dashboard.retentionChange}
+            icon={<Group />}
+            color={theme.palette.info.main}
+          />
+        )}
+        {isAdmin && (
+          <StatCard
+            title="Therapist Utilization"
+            value={`${dashboard.utilizationRate}%`}
+            change={dashboard.utilizationChange}
+            icon={<Spa />}
+            color={theme.palette.warning.main}
+          />
         )}
         {/* Therapist: Only show their own session summary */}
         {isTherapist && (
-          <Grid item xs={12} sm={12}>
-            <StatCard
-              title="My Sessions"
-              value={visibleSessions?.length || 0}
-              change={dashboard.sessionChange}
-              icon={<CalendarToday />}
-              color={theme.palette.primary.main}
-            />
-          </Grid>
+          <StatCard
+            title="My Sessions"
+            value={visibleSessions?.length || 0}
+            change={dashboard.sessionChange}
+            icon={<CalendarToday />}
+            color={theme.palette.primary.main}
+          />
         )}
-      </Grid>
+      </AnalyticsCardContainer>
 
-      {/* 2. Revenue Chart (admin/staff only) */}
+      {/* Revenue Chart (admin/staff only) */}
       {(isAdmin || isStaff) && (
         <Card sx={{ mb: 4, p: 3, borderRadius: 3 }}>
           <Typography variant="h6" fontWeight={600} mb={2}>Revenue Analytics</Typography>
@@ -388,7 +392,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* 3. Upcoming Sessions */}
+      {/* Upcoming Sessions */}
       <Card sx={{ p: 3, mb: 3, borderRadius: 3 }}>
         <Typography variant="h6" fontWeight={600} mb={3}>
           Upcoming Sessions
@@ -405,7 +409,7 @@ export default function DashboardPage() {
         </Grid>
       </Card>
 
-      {/* 4. Therapist Availability (admin only, grid, limited) */}
+      {/* Therapist Availability (admin only, grid, limited) */}
       {isAdmin && (
         <Card sx={{ p: 3, borderRadius: 3, mb: 3 }}>
           <Typography variant="h6" fontWeight={600} mb={3}>
@@ -428,7 +432,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* 5. Therapist: My Schedule */}
+      {/* Therapist: My Schedule */}
       {isTherapist && (
         <Card sx={{ p: 3, borderRadius: 3, mb: 3 }}>
           <Typography variant="h6" fontWeight={600} mb={3}>My Schedule (Next 7 Days)</Typography>

@@ -88,6 +88,7 @@ exports.getOverview = async (req, res) => {
       include: [
         { 
           model: User, 
+          as: 'user',
           attributes: ["firstName", "lastName"] 
         }
       ]
@@ -205,8 +206,8 @@ exports.getOverview = async (req, res) => {
       // console.log(`Calculated utilization: ${utilization}%`);
       // console.log(`---`);
 
-      return {
-        name: `${therapist.User?.firstName || 'Unknown'} ${therapist.User?.lastName || 'Unknown'}`,
+    return {
+        name: `${therapist.user?.firstName || 'Unknown'} ${therapist.user?.lastName || 'Unknown'}`, // FIXED: Updated property access
         availability: `${utilization}%`,
         sessions: therapistBookings.length,
         utilization: parseFloat(utilization),
@@ -229,13 +230,16 @@ exports.getOverview = async (req, res) => {
       include: [
         { 
           model: Client, 
+          as: 'client', // FIXED: Added alias
           attributes: ["firstName", "lastName"],
           required: true
         },
         { 
           model: Therapist, 
+          as: 'therapist', // FIXED: Added alias
           include: [{ 
             model: User, 
+            as: 'user', // FIXED: Added alias
             attributes: ["firstName", "lastName"] 
           }],
           required: false
@@ -245,11 +249,12 @@ exports.getOverview = async (req, res) => {
       limit: 4
     });
 
-    const formattedSessions = upcomingSessions.map(s => ({
+
+   const formattedSessions = upcomingSessions.map(s => ({
       id: s.id,
-      client: `${s.Client?.firstName || 'Unknown'} ${s.Client?.lastName || 'Client'}`,
-      therapist: s.Therapist && s.Therapist.User 
-        ? `${s.Therapist.User.firstName} ${s.Therapist.User.lastName}` 
+      client: `${s.client?.firstName || 'Unknown'} ${s.client?.lastName || 'Client'}`, // FIXED: Updated property access
+      therapist: s.therapist && s.therapist.user 
+        ? `${s.therapist.user.firstName} ${s.therapist.user.lastName}` // FIXED: Updated property access
         : "Unassigned",
       time: new Date(s.bookingStartTime).toLocaleTimeString([], { 
         hour: '2-digit', 
@@ -257,7 +262,7 @@ exports.getOverview = async (req, res) => {
         hour12: false 
       }),
       service: s.serviceName || "Session",
-      avatar: s.Client?.firstName ? s.Client.firstName[0].toUpperCase() : "?"
+      avatar: s.client?.firstName ? s.client.firstName[0].toUpperCase() : "?" // FIXED: Updated property access
     }));
 
     // 6. Revenue Chart (last 14 days)

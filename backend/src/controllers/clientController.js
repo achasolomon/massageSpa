@@ -54,9 +54,19 @@ exports.getClientById = async (req, res) => {
     try {
         const client = await Client.findByPk(id, {
             include: [
-                // Include related data if needed for the detail view
-                { model: Booking, limit: 5, order: [["bookingStartTime", "DESC"]] }, // Example: recent bookings
-                { model: ClinicalNote, limit: 3, order: [["createdAt", "DESC"]] } // Example: recent notes
+                // Include related data if needed for the detail view - FIXED: Added aliases
+                { 
+                  model: Booking, 
+                  as: 'bookings', // FIXED: Added alias
+                  limit: 5, 
+                  order: [["bookingStartTime", "DESC"]] 
+                },
+                { 
+                  model: ClinicalNote, 
+                  as: 'clinicalNotes', // FIXED: Added alias
+                  limit: 3, 
+                  order: [["createdAt", "DESC"]] 
+                }
             ]
         });
 
@@ -69,7 +79,6 @@ exports.getClientById = async (req, res) => {
         res.status(500).json({ message: "Server error while fetching client." });
     }
 };
-
 // Create a new client (Admin/Staff only - for manual entry)
 // Note: Booking creation already handles findOrCreateClient
 exports.createClient = async (req, res) => {

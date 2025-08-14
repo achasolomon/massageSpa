@@ -8,19 +8,18 @@ const { getEndTime } = require('../utils/timeUtils');
 exports.getAllServices = async (req, res) => {
   const { isActive, includeOptions, includeAvailability } = req.query;
   
-  // console.log('Query params:', req.query); // Add debug logging
-  
   const whereClause = {};
   const include = [];
 
   // Fix the isActive comparison - it comes as a string
   if (isActive !== undefined) {
-    whereClause.isActive = isActive === 'true'; // Convert string to boolean
+    whereClause.isActive = isActive === 'true';
   }
 
   if (includeOptions === 'true') {
     include.push({
       model: ServiceOption,
+      as: 'options', // FIXED: Added alias
       where: { isActive: true },
       required: false
     });
@@ -29,12 +28,15 @@ exports.getAllServices = async (req, res) => {
   if (includeAvailability === 'true') {
     include.push({
       model: ServiceAvailability,
+      as: 'availabilities', // FIXED: Added alias
       where: { isActive: true },
       required: false,
       include: [{
         model: Therapist,
+        as: 'therapist', // FIXED: Added alias
         include: [{
           model: User,
+          as: 'user', // FIXED: Added alias
           attributes: ["firstName", "lastName"]
         }],
         required: false
@@ -43,16 +45,11 @@ exports.getAllServices = async (req, res) => {
   }
 
   try {
-    // console.log('Where clause:', whereClause); // Add debug logging
-    // console.log('Include array:', include); // Add debug logging
-    
     const services = await Service.findAll({
       where: whereClause,
       include: include,
       order: [["name", "ASC"]],
     });
-    
-    // console.log('Found services:', services.length); // Add debug logging
     
     res.json(services);
   } catch (error) {
@@ -70,6 +67,7 @@ exports.getServiceById = async (req, res) => {
   if (includeOptions) {
     include.push({
       model: ServiceOption,
+      as: 'options', // FIXED: Added alias
       where: { isActive: true },
       required: false
     });
@@ -78,12 +76,15 @@ exports.getServiceById = async (req, res) => {
   if (includeAvailability) {
     include.push({
       model: ServiceAvailability,
+      as: 'availabilities', // FIXED: Added alias
       where: { isActive: true },
       required: false,
       include: [{
         model: Therapist,
+        as: 'therapist', // FIXED: Added alias
         include: [{
           model: User,
+          as: 'user', // FIXED: Added alias
           attributes: ["firstName", "lastName"]
         }],
         required: false
@@ -115,6 +116,7 @@ exports.getServicesByCategory = async (req, res) => {
   if (includeOptions) {
     include.push({
       model: ServiceOption,
+      as: 'options', // FIXED: Added alias
       where: { isActive: true },
       required: false
     });
@@ -123,6 +125,7 @@ exports.getServicesByCategory = async (req, res) => {
   if (includeAvailability) {
     include.push({
       model: ServiceAvailability,
+      as: 'availabilities', // FIXED: Added alias
       where: { isActive: true },
       required: false
     });
@@ -439,8 +442,10 @@ exports.getServiceAvailability = async (req, res) => {
       where: whereClause,
       include: [{
         model: Therapist,
+        as: 'therapist', // FIXED: Added alias
         include: [{
           model: User,
+          as: 'user', // FIXED: Added alias
           attributes: ["firstName", "lastName"]
         }],
         required: false
@@ -468,7 +473,12 @@ exports.addServiceAvailability = async (req, res) => {
   try {
     const [service, option] = await Promise.all([
       Service.findByPk(serviceId),
-      ServiceOption.findByPk(serviceOptionId)
+      ServiceOption.findByPk(serviceOptionId, {
+        include: [{
+          model: Service,
+          as: 'service' // FIXED: Added alias
+        }]
+      })
     ]);
 
     if (!service) return res.status(404).json({ message: "Service not found." });
@@ -490,7 +500,7 @@ exports.addServiceAvailability = async (req, res) => {
       startTime: formattedStartTime,
       endTime,
       bookingLimit: bookingLimit || 1,
-      currentBookings: 0, // Initialize with 0 bookings
+      currentBookings: 0,
       isActive: isActive !== undefined ? isActive : true,
     });
 
@@ -562,8 +572,6 @@ exports.getAvailableSlots = async (req, res) => {
   const { serviceId } = req.params;
   const { date, serviceOptionId, therapistId } = req.query;
 
-  // console.log('Fetching slots for:', { serviceId, date, serviceOptionId, therapistId });
-
   try {
     // Verify service exists
     const service = await Service.findByPk(serviceId);
@@ -574,7 +582,11 @@ exports.getAvailableSlots = async (req, res) => {
     // Verify service option exists and belongs to this service
     if (serviceOptionId) {
       const serviceOption = await ServiceOption.findOne({
-        where: { id: serviceOptionId, serviceId }
+        where: { id: serviceOptionId, serviceId },
+        include: [{
+          model: Service,
+          as: 'service' // FIXED: Added alias
+        }]
       });
       if (!serviceOption) {
         return res.status(404).json({ message: "Service option not found for this service." });
@@ -582,16 +594,14 @@ exports.getAvailableSlots = async (req, res) => {
     }
 
     const targetDate = new Date(date);
-    const dayOfWeek = targetDate.getDay(); // 0=Sunday, 1=Monday, etc.
+    const dayOfWeek = targetDate.getDay();
 
     // Build where clause based on your model structure
     const whereClause = {
       serviceId,
       isActive: true,
       [Op.or]: [
-        // Specific date availability (overrides)
         { specificDate: date },
-        // Regular weekly availability (only if no specific date)
         {
           dayOfWeek: dayOfWeek,
           specificDate: null
@@ -609,22 +619,23 @@ exports.getAvailableSlots = async (req, res) => {
       whereClause.therapistId = therapistId;
     }
 
-    // console.log('Where clause:', JSON.stringify(whereClause, null, 2));
-
-    // Fetch availability rules
+    // Fetch availability rules - FIXED: Added aliases
     const availabilityRules = await ServiceAvailability.findAll({
       where: whereClause,
       include: [
         {
           model: Therapist,
+          as: 'therapist', // FIXED: Added alias
           include: [{
             model: User,
+            as: 'user', // FIXED: Added alias
             attributes: ["firstName", "lastName"]
           }],
           required: false
         },
         {
           model: ServiceOption,
+          as: 'serviceOption', // FIXED: Added alias
           attributes: ['duration', 'price', 'optionName'],
           required: true
         }
@@ -632,11 +643,9 @@ exports.getAvailableSlots = async (req, res) => {
       order: [['startTime', 'ASC']]
     });
 
-    // console.log(`Found ${availabilityRules.length} availability rules`);
-
     // Calculate available slots
     const slots = await Promise.all(availabilityRules.map(async (rule) => {
-      const slotDateTime = new Date(`${date}T${rule.startTime}`); // e.g. 2025-06-09T09:00:00
+      const slotDateTime = new Date(`${date}T${rule.startTime}`);
 
       // Count existing bookings for this exact slot
       const bookedCount = await Booking.count({
@@ -650,7 +659,7 @@ exports.getAvailableSlots = async (req, res) => {
 
       // Calculate end time using service option duration
       const startTime = rule.startTime;
-      const duration = rule.ServiceOption.duration;
+      const duration = rule.serviceOption.duration; // FIXED: Updated property access
       const endTime = calculateEndTime(startTime, duration);
 
       const remaining = rule.bookingLimit - bookedCount;
@@ -661,20 +670,19 @@ exports.getAvailableSlots = async (req, res) => {
         endTime: endTime,
         duration: duration,
         serviceOptionId: rule.serviceOptionId,
-        therapist: rule.Therapist ? {
+        therapist: rule.therapist ? { // FIXED: Updated property access
           id: rule.therapistId,
-          name: `${rule.Therapist.User.firstName} ${rule.Therapist.User.lastName}`
+          name: `${rule.therapist.user.firstName} ${rule.therapist.user.lastName}` // FIXED: Updated property access
         } : null,
         available: remaining > 0,
         remaining: remaining,
         bookingLimit: rule.bookingLimit,
         currentBookings: bookedCount,
-        price: rule.ServiceOption.price,
-        optionName: rule.ServiceOption.optionName
+        price: rule.serviceOption.price, // FIXED: Updated property access
+        optionName: rule.serviceOption.optionName // FIXED: Updated property access
       };
     }));
 
-    // console.log(`Returning ${slots.length} slots`);
     res.json(slots);
 
   } catch (error) {
@@ -800,7 +808,10 @@ exports.bookSlot = async (req, res) => {
 
   try {
     const availability = await ServiceAvailability.findByPk(availabilityId, {
-      include: [ServiceOption]
+      include: [{
+        model: ServiceOption,
+        as: 'serviceOption' // FIXED: Added alias
+      }]
     });
 
     if (!availability) {
@@ -831,7 +842,7 @@ exports.bookSlot = async (req, res) => {
       startTime: availability.startTime,
       endTime: availability.endTime,
       status: 'confirmed',
-      price: availability.ServiceOption.price
+      price: availability.serviceOption.price // FIXED: Updated property access
     });
 
     // Update availability count
@@ -845,6 +856,7 @@ exports.bookSlot = async (req, res) => {
     res.status(500).json({ message: "Failed to book appointment." });
   }
 };
+
 // Delete service availability rule
 exports.deleteServiceAvailability = async (req, res) => {
   const { availabilityId } = req.params;

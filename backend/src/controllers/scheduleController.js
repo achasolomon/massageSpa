@@ -23,9 +23,15 @@ exports.getTherapistDailySchedule = async (req, res) => {
     const { therapistId } = req.params;
     const { date } = req.query;
 
-    // Authorization check
+    // Authorization check - FIXED: Added alias
     if (req.user.role === 'therapist') {
-      const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+      const therapist = await Therapist.findOne({ 
+        where: { userId: req.user.id },
+        include: [{
+          model: User,
+          as: 'user' // FIXED: Added alias
+        }]
+      });
       if (!therapist || therapist.id !== therapistId) {
         return res.status(403).json(createResponse(
           false, null, "Access denied", ["You can only view your own schedule"]
@@ -71,9 +77,15 @@ exports.getTherapistWeeklySchedule = async (req, res) => {
     const { therapistId } = req.params;
     const { startDate } = req.query;
 
-    // Authorization check
+    // Authorization check - FIXED: Added alias
     if (req.user.role === 'therapist') {
-      const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+      const therapist = await Therapist.findOne({ 
+        where: { userId: req.user.id },
+        include: [{
+          model: User,
+          as: 'user' // FIXED: Added alias
+        }]
+      });
       if (!therapist || therapist.id !== therapistId) {
         return res.status(403).json(createResponse(
           false, null, "Access denied", ["You can only view your own schedule"]
@@ -105,6 +117,8 @@ exports.getTherapistWeeklySchedule = async (req, res) => {
     ));
   }
 };
+
+
 
 /**
  * Get all therapists schedule overview for a specific date
@@ -212,7 +226,13 @@ exports.getMyDailySchedule = async (req, res) => {
       ));
     }
 
-    const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+    const therapist = await Therapist.findOne({ 
+      where: { userId: req.user.id },
+      include: [{
+        model: User,
+        as: 'user' // FIXED: Added alias
+      }]
+    });
     if (!therapist) {
       return res.status(404).json(createResponse(
         false, null, "Profile not found", ["Therapist profile not found"]
@@ -243,7 +263,13 @@ exports.getMyWeeklySchedule = async (req, res) => {
       ));
     }
 
-    const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+    const therapist = await Therapist.findOne({ 
+      where: { userId: req.user.id },
+      include: [{
+        model: User,
+        as: 'user' // FIXED: Added alias
+      }]
+    });
     if (!therapist) {
       return res.status(404).json(createResponse(
         false, null, "Profile not found", ["Therapist profile not found"]
@@ -272,9 +298,15 @@ exports.getTherapistAvailabilitySettings = async (req, res) => {
   try {
     const { therapistId } = req.params;
 
-    // Authorization check
+    // Authorization check - FIXED: Added alias
     if (req.user.role === 'therapist') {
-      const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+      const therapist = await Therapist.findOne({ 
+        where: { userId: req.user.id },
+        include: [{
+          model: User,
+          as: 'user' // FIXED: Added alias
+        }]
+      });
       if (!therapist || therapist.id !== therapistId) {
         return res.status(403).json(createResponse(
           false, null, "Access denied", ["You can only view your own availability settings"]
@@ -287,6 +319,14 @@ exports.getTherapistAvailabilitySettings = async (req, res) => {
         therapistId,
         isActive: true
       },
+      include: [{
+        model: Therapist,
+        as: 'therapist', // FIXED: Added alias
+        include: [{
+          model: User,
+          as: 'user' // FIXED: Added alias
+        }]
+      }],
       order: [
         ['type', 'ASC'],
         ['dayOfWeek', 'ASC'],
@@ -323,9 +363,15 @@ exports.createAvailabilitySetting = async (req, res) => {
   try {
     const { therapistId, type, dayOfWeek, specificDate, startTime, endTime, effectiveFrom, effectiveTo, notes } = req.body;
 
-    // Authorization check
+    // Authorization check - FIXED: Added alias
     if (req.user.role === 'therapist') {
-      const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+      const therapist = await Therapist.findOne({ 
+        where: { userId: req.user.id },
+        include: [{
+          model: User,
+          as: 'user' // FIXED: Added alias
+        }]
+      });
       if (!therapist || therapist.id !== therapistId) {
         return res.status(403).json(createResponse(
           false, null, "Access denied", ["You can only manage your own availability"]
@@ -500,7 +546,13 @@ exports.getMyAvailabilitySettings = async (req, res) => {
       ));
     }
 
-    const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+    const therapist = await Therapist.findOne({ 
+      where: { userId: req.user.id },
+      include: [{
+        model: User,
+        as: 'user' // FIXED: Added alias
+      }]
+    });
     if (!therapist) {
       return res.status(404).json(createResponse(
         false, null, "Profile not found", ["Therapist profile not found"]
@@ -531,7 +583,13 @@ exports.createMyAvailabilitySetting = async (req, res) => {
       ));
     }
 
-    const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+    const therapist = await Therapist.findOne({ 
+      where: { userId: req.user.id },
+      include: [{
+        model: User,
+        as: 'user' // FIXED: Added alias
+      }]
+    });
     if (!therapist) {
       return res.status(404).json(createResponse(
         false, null, "Profile not found", ["Therapist profile not found"]
@@ -561,9 +619,15 @@ exports.getTherapistScheduleStats = async (req, res) => {
     const { therapistId } = req.params;
     const { startDate, endDate } = req.query;
 
-    // Authorization check
+    // Authorization check - FIXED: Added alias
     if (req.user.role === 'therapist') {
-      const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+      const therapist = await Therapist.findOne({ 
+        where: { userId: req.user.id },
+        include: [{
+          model: User,
+          as: 'user' // FIXED: Added alias
+        }]
+      });
       if (!therapist || therapist.id !== therapistId) {
         return res.status(403).json(createResponse(
           false, null, "Access denied", ["You can only view your own statistics"]
@@ -618,9 +682,15 @@ exports.bulkUpdateAvailability = async (req, res) => {
   try {
     const { therapistId, settings } = req.body;
 
-    // Authorization check
+    // Authorization check - FIXED: Added alias
     if (req.user.role === 'therapist') {
-      const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+      const therapist = await Therapist.findOne({ 
+        where: { userId: req.user.id },
+        include: [{
+          model: User,
+          as: 'user' // FIXED: Added alias
+        }]
+      });
       if (!therapist || therapist.id !== therapistId) {
         return res.status(403).json(createResponse(
           false, null, "Access denied", ["You can only update your own availability"]
@@ -667,6 +737,7 @@ exports.bulkUpdateAvailability = async (req, res) => {
   }
 };
 
+
 /**
  * Create bulk availability settings
  * POST /api/v1/schedule/availability-settings/bulk
@@ -681,9 +752,15 @@ exports.createBulkAvailabilitySettings = async (req, res) => {
       ));
     }
 
-    // Authorization check - ensure all settings are for therapists the user can manage
+    // Authorization check - FIXED: Added alias
     if (req.user.role === 'therapist') {
-      const therapist = await Therapist.findOne({ where: { userId: req.user.id } });
+      const therapist = await Therapist.findOne({ 
+        where: { userId: req.user.id },
+        include: [{
+          model: User,
+          as: 'user' // FIXED: Added alias
+        }]
+      });
       if (!therapist) {
         return res.status(404).json(createResponse(
           false, null, "Profile not found", ["Therapist profile not found"]

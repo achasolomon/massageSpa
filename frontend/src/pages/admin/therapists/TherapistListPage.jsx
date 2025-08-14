@@ -48,6 +48,30 @@ const StatusChip = styled(Chip)(({ theme, status }) => ({
     '& .MuiChip-label': { padding: '0 8px' },
 }));
 
+// Styled Analytics Card Container
+const AnalyticsCardContainer = styled(Box)(({ theme }) => ({
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+    gap: theme.spacing(3),
+    marginBottom: theme.spacing(4),
+    [theme.breakpoints.up('sm')]: {
+        gridTemplateColumns: 'repeat(2, 1fr)',
+    },
+    [theme.breakpoints.up('md')]: {
+        gridTemplateColumns: 'repeat(3, 1fr)',
+    },
+}));
+
+const StyledAnalyticsCard = styled(Card)(({ theme }) => ({
+    borderRadius: 12,
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+    '&:hover': {
+        transform: 'translateY(-2px)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    },
+}));
+
 export default function TherapistListPage() {
     // State
     const [therapists, setTherapists] = useState([]);
@@ -378,54 +402,56 @@ export default function TherapistListPage() {
                 </Typography>
             </Box>
 
-            {/* Analytics Cards */}
-            <Grid container spacing={3} sx={{ mb: 4, justifyContent: 'space-between' }}>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>
-                                    <Group />
-                                </Avatar>
-                                <Box>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalTherapists}</Typography>
-                                    <Typography variant="body2" color="text.secondary">Total Therapists</Typography>
-                                </Box>
+            {/* Analytics Cards - Fixed Layout */}
+            <AnalyticsCardContainer>
+                <StyledAnalyticsCard>
+                    <CardContent sx={{ p: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>
+                                <Group />
+                            </Avatar>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{totalTherapists}</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                                    Total Therapists
+                                </Typography>
                             </Box>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar sx={{ bgcolor: 'success.main', width: 48, height: 48 }}>
-                                    <Person />
-                                </Avatar>
-                                <Box>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalActive}</Typography>
-                                    <Typography variant="body2" color="text.secondary">Active Therapists</Typography>
-                                </Box>
+                        </Box>
+                    </CardContent>
+                </StyledAnalyticsCard>
+
+                <StyledAnalyticsCard>
+                    <CardContent sx={{ p: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Avatar sx={{ bgcolor: 'success.main', width: 48, height: 48 }}>
+                                <Person />
+                            </Avatar>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{totalActive}</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                                    Active Therapists
+                                </Typography>
                             </Box>
-                        </CardContent>
-                    </Card>
-                </Grid>
-                <Grid item xs={12} sm={6} md={3}>
-                    <Card sx={{ borderRadius: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                        <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Avatar sx={{ bgcolor: 'info.main', width: 48, height: 48 }}>
-                                    <AdminPanelSettings />
-                                </Avatar>
-                                <Box>
-                                    <Typography variant="h5" sx={{ fontWeight: 700 }}>{services.length}</Typography>
-                                    <Typography variant="body2" color="text.secondary">Available Services</Typography>
-                                </Box>
+                        </Box>
+                    </CardContent>
+                </StyledAnalyticsCard>
+
+                <StyledAnalyticsCard>
+                    <CardContent sx={{ p: 3 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Avatar sx={{ bgcolor: 'info.main', width: 48, height: 48 }}>
+                                <AdminPanelSettings />
+                            </Avatar>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{services.length}</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                                    Available Services
+                                </Typography>
                             </Box>
-                        </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
+                        </Box>
+                    </CardContent>
+                </StyledAnalyticsCard>
+            </AnalyticsCardContainer>
 
             {/* Search and Filter Bar */}
             <Box sx={{
@@ -531,17 +557,30 @@ export default function TherapistListPage() {
                         textAlign: { xs: 'left', md: 'right' },
                         alignSelf: 'center'
                     }}>
-                        <Button
-                            variant="outlined"
-                            startIcon={<FileDownload />}
-                            onClick={exportToCSV}
-                            sx={{
-                                whiteSpace: 'nowrap',
-                                width: { xs: '100%', md: 'auto' }
-                            }}
-                        >
-                            Export CSV
-                        </Button>
+                        <Stack direction="row" spacing={1} sx={{ justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+                            <Button
+                                variant="contained"
+                                startIcon={<Add />}
+                                onClick={handleAddTherapist}
+                                sx={{
+                                    whiteSpace: 'nowrap',
+                                    flex: { xs: 1, md: 'none' }
+                                }}
+                            >
+                                Add Therapist
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                startIcon={<FileDownload />}
+                                onClick={exportToCSV}
+                                sx={{
+                                    whiteSpace: 'nowrap',
+                                    flex: { xs: 1, md: 'none' }
+                                }}
+                            >
+                                Export CSV
+                            </Button>
+                        </Stack>
                     </Grid>
                 </Grid>
 
@@ -607,49 +646,79 @@ export default function TherapistListPage() {
                                     <TableCell align="right">Actions</TableCell>
                                 </TableRow>
                             </TableHead>
-                            <TableBody>                                {filteredTherapists.map(therapist => (
-                                <TableRow key={therapist.id} hover selected={selected.includes(therapist.id)}>
-                                    <TableCell padding="checkbox">
-                                        <Checkbox
-                                            color="primary"
-                                            checked={selected.includes(therapist.id)}
-                                            onChange={e => handleSelectClick(e, therapist.id)}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Stack direction="row" alignItems="center" spacing={1}>
-                                            {therapist.profilePictureUrl && (
-                                                <Avatar
-                                                    src={therapist.profilePictureUrl}
-                                                    sx={{ width: 32, height: 32 }}
-                                                />
-                                            )}
-                                            <Typography>{therapist.fullName}</Typography>
-                                        </Stack>
-                                    </TableCell>
-                                    <TableCell>
-                                        {(() => {
-                                            let specialties = [];
-                                            try {
-                                                const parsed = JSON.parse(therapist.specialties);
-                                                specialties = Array.isArray(parsed) ? parsed : [];
-                                            } catch {
-                                                specialties = [];
-                                            }
+                            <TableBody>
+                                {filteredTherapists.map(therapist => (
+                                    <TableRow key={therapist.id} hover selected={selected.includes(therapist.id)}>
+                                        <TableCell padding="checkbox">
+                                            <Checkbox
+                                                color="primary"
+                                                checked={selected.includes(therapist.id)}
+                                                onChange={e => handleSelectClick(e, therapist.id)}
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <Stack direction="row" alignItems="center" spacing={1}>
+                                                {therapist.profilePictureUrl && (
+                                                    <Avatar
+                                                        src={therapist.profilePictureUrl}
+                                                        sx={{ width: 32, height: 32 }}
+                                                    />
+                                                )}
+                                                <Typography>{therapist.fullName}</Typography>
+                                            </Stack>
+                                        </TableCell>
+                                        <TableCell>
+                                            {(() => {
+                                                let specialties = [];
+                                                try {
+                                                    const parsed = JSON.parse(therapist.specialties);
+                                                    specialties = Array.isArray(parsed) ? parsed : [];
+                                                } catch {
+                                                    specialties = [];
+                                                }
 
-                                            return specialties.length > 0 ? (
+                                                return specialties.length > 0 ? (
+                                                    <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                                                        {specialties.slice(0, 2).map((specialty, index) => (
+                                                            <Chip
+                                                                key={index}
+                                                                label={specialty}
+                                                                size="small"
+                                                                sx={{ mb: 0.5, fontSize: '0.60rem' }}
+                                                            />
+                                                        ))}
+                                                        {specialties.length > 2 && (
+                                                            <Chip
+                                                                label={`+${specialties.length - 2}`}
+                                                                size="small"
+                                                                variant="outlined"
+                                                                sx={{ mb: 0.5, fontSize: '0.60rem' }}
+                                                            />
+                                                        )}
+                                                    </Stack>
+                                                ) : (
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        No specialties
+                                                    </Typography>
+                                                );
+                                            })()}
+                                        </TableCell>
+                                        <TableCell>
+                                            {therapist.Services && therapist.Services.length > 0 ? (
                                                 <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                                                    {specialties.slice(0, 2).map((specialty, index) => (
+                                                    {therapist.Services.slice(0, 2).map((service, index) => (
                                                         <Chip
                                                             key={index}
-                                                            label={specialty}
+                                                            label={service.name}
                                                             size="small"
+                                                            color="primary"
+                                                            variant="outlined"
                                                             sx={{ mb: 0.5, fontSize: '0.60rem' }}
                                                         />
                                                     ))}
-                                                    {specialties.length > 2 && (
+                                                    {therapist.Services.length > 2 && (
                                                         <Chip
-                                                            label={`+${specialties.length - 2}`}
+                                                            label={`+${therapist.Services.length - 2}`}
                                                             size="small"
                                                             variant="outlined"
                                                             sx={{ mb: 0.5, fontSize: '0.60rem' }}
@@ -658,65 +727,36 @@ export default function TherapistListPage() {
                                                 </Stack>
                                             ) : (
                                                 <Typography variant="body2" color="text.secondary">
-                                                    No specialties
+                                                    No services
                                                 </Typography>
-                                            );
-                                        })()}
-                                    </TableCell>
-                                    <TableCell>
-                                        {therapist.Services && therapist.Services.length > 0 ? (
-                                            <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                                                {therapist.Services.slice(0, 2).map((service, index) => (
-                                                    <Chip
-                                                        key={index}
-                                                        label={service.name}
-                                                        size="small"
-                                                        color="primary"
-                                                        variant="outlined"
-                                                        sx={{ mb: 0.5, fontSize: '0.60rem' }}
-                                                    />
-                                                ))}
-                                                {therapist.Services.length > 2 && (
-                                                    <Chip
-                                                        label={`+${therapist.Services.length - 2}`}
-                                                        size="small"
-                                                        variant="outlined"
-                                                        sx={{ mb: 0.5, fontSize: '0.60rem' }}
-                                                    />
-                                                )}
-                                            </Stack>
-                                        ) : (
-                                            <Typography variant="body2" color="text.secondary">
-                                                No services
-                                            </Typography>
-                                        )}
-                                    </TableCell>
+                                            )}
+                                        </TableCell>
 
-                                    <TableCell>
-                                        <StatusChip
-                                            label={therapist.isActive ? 'Active' : 'Inactive'}
-                                            status={therapist.isActive ? 'active' : 'inactive'}
-                                        />
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Tooltip title="View">
-                                            <IconButton onClick={() => handleViewTherapist(therapist)}>
-                                                <Visibility />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Edit">
-                                            <IconButton onClick={() => handleEditTherapist(therapist)}>
-                                                <Edit />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title={therapist.isActive ? "Deactivate" : "Activate"}>
-                                            <IconButton onClick={() => handleDeleteTherapist(therapist)}>
-                                                <Delete />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                                        <TableCell>
+                                            <StatusChip
+                                                label={therapist.isActive ? 'Active' : 'Inactive'}
+                                                status={therapist.isActive ? 'active' : 'inactive'}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            <Tooltip title="View">
+                                                <IconButton onClick={() => handleViewTherapist(therapist)}>
+                                                    <Visibility />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Edit">
+                                                <IconButton onClick={() => handleEditTherapist(therapist)}>
+                                                    <Edit />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title={therapist.isActive ? "Deactivate" : "Activate"}>
+                                                <IconButton onClick={() => handleDeleteTherapist(therapist)}>
+                                                    <Delete />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                                 {filteredTherapists.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={8} align="center">

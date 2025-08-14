@@ -64,6 +64,30 @@ const RoleChip = styled(Chip)(({ theme, role }) => {
   };
 });
 
+// Styled Analytics Card Container
+const AnalyticsCardContainer = styled(Box)(({ theme }) => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+  gap: theme.spacing(3),
+  marginBottom: theme.spacing(4),
+  [theme.breakpoints.up('sm')]: {
+    gridTemplateColumns: 'repeat(2, 1fr)',
+  },
+  [theme.breakpoints.up('md')]: {
+    gridTemplateColumns: 'repeat(4, 1fr)',
+  },
+}));
+
+const StyledAnalyticsCard = styled(Card)(({ theme }) => ({
+  borderRadius: 12,
+  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+  '&:hover': {
+    transform: 'translateY(-2px)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+  },
+}));
+
 export default function EnhancedUserManagement() {
   // State
   const [users, setUsers] = useState([]);
@@ -258,69 +282,74 @@ export default function EnhancedUserManagement() {
           Manage your team members and their permissions
         </Typography>
       </Box>
-      {/* Analytics Cards */}
-      <Grid container spacing={3} sx={{ mb: 4, justifyContent: 'space-between'}}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>
-                  <Group />
-                </Avatar>
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalUsers}</Typography>
-                  <Typography variant="body2" color="text.secondary">Total Users</Typography>
-                </Box>
+
+      {/* Analytics Cards - Fixed Layout */}
+      <AnalyticsCardContainer>
+        <StyledAnalyticsCard>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>
+                <Group />
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{totalUsers}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                  Total Users
+                </Typography>
               </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Avatar sx={{ bgcolor: 'success.main', width: 48, height: 48 }}>
-                  <Person />
-                </Avatar>
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalActive}</Typography>
-                  <Typography variant="body2" color="text.secondary">Active Users</Typography>
-                </Box>
+            </Box>
+          </CardContent>
+        </StyledAnalyticsCard>
+
+        <StyledAnalyticsCard>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'success.main', width: 48, height: 48 }}>
+                <Person />
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{totalActive}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                  Active Users
+                </Typography>
               </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Avatar sx={{ bgcolor: 'error.main', width: 48, height: 48 }}>
-                  <AdminPanelSettings />
-                </Avatar>
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalAdmins}</Typography>
-                  <Typography variant="body2" color="text.secondary">Admins</Typography>
-                </Box>
+            </Box>
+          </CardContent>
+        </StyledAnalyticsCard>
+
+        <StyledAnalyticsCard>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'error.main', width: 48, height: 48 }}>
+                <AdminPanelSettings />
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{totalAdmins}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                  Admins
+                </Typography>
               </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card sx={{ borderRadius: 3, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Avatar sx={{ bgcolor: 'info.main', width: 48, height: 48 }}>
-                  <Group />
-                </Avatar>
-                <Box>
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>{totalTherapists}</Typography>
-                  <Typography variant="body2" color="text.secondary">Therapists</Typography>
-                </Box>
+            </Box>
+          </CardContent>
+        </StyledAnalyticsCard>
+
+        <StyledAnalyticsCard>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Avatar sx={{ bgcolor: 'info.main', width: 48, height: 48 }}>
+                <Group />
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{totalTherapists}</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
+                  Therapists
+                </Typography>
               </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+            </Box>
+          </CardContent>
+        </StyledAnalyticsCard>
+      </AnalyticsCardContainer>
+
       {/* Search and Filter Bar */}
       <Box sx={{ mb: 3, bgcolor: 'white', p: 3, borderRadius: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
         <Grid container spacing={2} alignItems="center">
@@ -369,6 +398,7 @@ export default function EnhancedUserManagement() {
           </Grid>
         </Grid>
       </Box>
+
       {/* Table */}
       <StyledTableContainer>
         {loading ? (
@@ -407,9 +437,6 @@ export default function EnhancedUserManagement() {
                     </TableCell>
                     <TableCell>
                       <Stack direction="row" alignItems="center" spacing={1}>
-                        {/* <Avatar sx={{ bgcolor: alpha('#1976d2', 0.15), color: '#1976d2', width: 32, height: 32 }}>
-                          {user.firstName?.[0]}{user.lastName?.[0]}
-                        </Avatar>*/}
                         <Typography>{user.fullName}</Typography>
                       </Stack>
                     </TableCell>
@@ -630,6 +657,6 @@ export default function EnhancedUserManagement() {
       <Backdrop open={backdrop} sx={{ zIndex: 9999, color: '#fff' }}>
         <CircularProgress color="inherit" />
       </Backdrop>
-    </Box >
+    </Box>
   );
 }

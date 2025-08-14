@@ -99,6 +99,8 @@ exports.getRevenueReport = async (req, res) => {
 
 
 // Get Booking Statistics Report (Admin only)
+// Get Booking Statistics Report (Admin only)
+// Get Booking Statistics Report (Admin only) - Clean Version
 exports.getBookingStatsReport = async (req, res) => {
   const { startDate, endDate, therapistId, serviceId } = req.query;
 
@@ -121,50 +123,127 @@ exports.getBookingStatsReport = async (req, res) => {
     if (therapistId) baseWhere.therapistId = therapistId;
     if (serviceId) baseWhere.serviceOptionId = serviceId;
 
-    // Where clause specifically for confirmed bookings
-    const confirmedWhere = { ...baseWhere, status: 'Confirmed' };
+    console.log('Base where clause:', baseWhere);
 
-    // 1. Get total confirmed bookings (primary metric)
-    const totalConfirmed = await Booking.count({ where: confirmedWhere });
-
-    // 2. Get status breakdown (including confirmed)
+    // 1. Get status breakdown with all bookings
     const statusStats = await Booking.findAll({
-      where: baseWhere, // All statuses
+      where: baseWhere,
       attributes: ["status", [fn("COUNT", col("id")), "count"]],
       group: ["status"],
       raw: true,
     });
 
-    // Calculate derived metrics
-    const totalNoShow = parseInt(statusStats.find(s => s.status === "No Show")?.count || 0);
-    const totalCancelled = statusStats
-      .filter(s => ["Cancelled By Client", "Cancelled By Staff"].includes(s.status))
-      .reduce((sum, s) => sum + parseInt(s.count), 0);
+    console.log('Status stats:', statusStats);
 
+    // Calculate metrics from status breakdown
+    const getStatusCount = (status) => {
+      const found = statusStats.find(s => s.status === status);
+      return parseInt(found?.count || 0);
+    };
+
+    const totalConfirmed = getStatusCount('Confirmed');
+    const totalCompleted = getStatusCount('Completed');
+    const totalNoShow = getStatusCount('No Show');
+    const totalCancelledByClient = getStatusCount('Cancelled By Client');
+    const totalCancelledByStaff = getStatusCount('Cancelled By Staff');
+    const totalCancelled = totalCancelledByClient + totalCancelledByStaff;
+
+    // Total bookings (all statuses)
+    const totalBookings = statusStats.reduce((sum, s) => sum + parseInt(s.count), 0);
     const noShowRate = totalConfirmed > 0 ? totalNoShow / totalConfirmed : 0;
 
-    // 3. Get confirmed bookings by service
-    const confirmedByService = await Booking.findAll({
-      where: confirmedWhere,
-      attributes: ["serviceOptionId", [fn("COUNT", col("id")), "count"]],
-      group: ["serviceOptionId"],
-      raw: true,
+    // 2. Get bookings by service option ID
+    const bookingsByServiceOption = await Booking.findAll({
+      where: baseWhere,
+      attributes: [
+        'serviceOptionId',
+        [fn("COUNT", col("id")), "count"]
+      ],
+      group: ['serviceOptionId'],
+      raw: true
     });
 
-    // 4. Get confirmed bookings by therapist
-    const confirmedByTherapist = await Booking.findAll({
+    console.log('Bookings by service option:', bookingsByServiceOption);
+
+    // 3. Get bookings by therapist ID
+    const bookingsByTherapistId = await Booking.findAll({
       where: {
-        ...confirmedWhere,
+        ...baseWhere,
         therapistId: { [Op.not]: null },
       },
-      attributes: ["therapistId", [fn("COUNT", col("id")), "count"]],
-      group: ["therapistId"],
-      raw: true,
+      attributes: [
+        'therapistId',
+        [fn("COUNT", col("id")), "count"]
+      ],
+      group: ['therapistId'],
+      raw: true
     });
 
-    // 5. Peak booking hours for confirmed bookings
+    console.log('Bookings by therapist ID:', bookingsByTherapistId);
+
+    // 4. Get therapist details using the therapist IDs
+    const therapistIds = bookingsByTherapistId.map(b => b.therapistId);
+    let therapistDetails = [];
+    
+    if (therapistIds.length > 0) {
+      // Get therapist records with their userId
+      const therapists = await Therapist.findAll({
+        where: { id: { [Op.in]: therapistIds } },
+        attributes: ['id', 'userId'],
+        raw: true
+      });
+
+      // Get user details for these therapists
+      const userIds = therapists.map(t => t.userId);
+      const users = await User.findAll({
+        where: { id: { [Op.in]: userIds } },
+        attributes: ['id', 'firstName', 'lastName'],
+        raw: true
+      });
+
+      // Map therapist ID to user name
+      therapistDetails = therapists.map(therapist => {
+        const user = users.find(u => u.id === therapist.userId);
+        return {
+          therapistId: therapist.id,
+          name: user ? `${user.firstName} ${user.lastName}` : 'Unknown Therapist'
+        };
+      });
+    }
+
+    console.log('Therapist details:', therapistDetails);
+
+    // 5. Get service option details using the service option IDs
+    const serviceOptionIds = bookingsByServiceOption.map(b => b.serviceOptionId);
+    let serviceDetails = [];
+    
+    if (serviceOptionIds.length > 0) {
+      // Get service options with their service details
+      const serviceOptions = await ServiceOption.findAll({
+        where: { id: { [Op.in]: serviceOptionIds } },
+        include: [
+          {
+            model: Service,
+            as: 'service', 
+            attributes: ['name']
+          }
+        ],
+        raw: true,
+        nest: true
+      });
+
+      serviceDetails = serviceOptions.map(option => ({
+        serviceOptionId: option.id,
+        serviceName: option.service?.name || 'Unknown Service',
+        optionName: option.optionName || 'Unknown Option'
+      }));
+    }
+
+    console.log('Service details:', serviceDetails);
+
+    // 6. Peak booking hours
     const peakTimes = await Booking.findAll({
-      where: confirmedWhere,
+      where: baseWhere,
       attributes: [
         [fn('HOUR', col('bookingStartTime')), 'hour'],
         [fn("COUNT", col("id")), "count"]
@@ -179,25 +258,41 @@ exports.getBookingStatsReport = async (req, res) => {
     let avgBookingsPerDay = 0;
     if (startDate && endDate) {
       const dayDiff = Math.max(1, Math.ceil((parseISO(endDate) - parseISO(startDate)) / (1000 * 60 * 60 * 24)));
-      avgBookingsPerDay = totalConfirmed / dayDiff;
+      avgBookingsPerDay = totalBookings / dayDiff;
     }
 
-    // Prepare response
+    // Format data for frontend
+    const formattedBookingsByService = bookingsByServiceOption.map(item => {
+      const serviceDetail = serviceDetails.find(s => s.serviceOptionId === item.serviceOptionId);
+      return {
+        serviceName: serviceDetail?.serviceName || `Service Option ${item.serviceOptionId}`,
+        serviceOptionName: serviceDetail?.optionName || '',
+        count: parseInt(item.count)
+      };
+    });
+
+    const formattedBookingsByTherapist = bookingsByTherapistId.map(item => {
+      const therapistDetail = therapistDetails.find(t => t.therapistId === item.therapistId);
+      return {
+        therapistName: therapistDetail?.name || `Therapist ${item.therapistId}`,
+        therapistId: item.therapistId,
+        count: parseInt(item.count)
+      };
+    });
+
+    // Prepare response with correct property names expected by frontend
     res.json({
       // Primary metrics
+      totalBookings,
       totalConfirmed,
+      totalCompleted,
+      totalCancelled,
       noShowRate,
       avgBookingsPerDay: Math.round(avgBookingsPerDay * 100) / 100,
       
-      // Breakdowns
-      confirmedByService: confirmedByService.map(item => ({
-        serviceOptionId: item.serviceOptionId,
-        count: parseInt(item.count),
-      })),
-      confirmedByTherapist: confirmedByTherapist.map(item => ({
-        therapistId: item.therapistId,
-        count: parseInt(item.count),
-      })),
+      // Breakdowns with correct property names
+      bookingsByService: formattedBookingsByService,
+      bookingsByTherapist: formattedBookingsByTherapist,
       statusBreakdown: statusStats.map(s => ({
         status: s.status,
         count: parseInt(s.count),
@@ -221,12 +316,12 @@ exports.getBookingStatsReport = async (req, res) => {
 
   } catch (error) {
     console.error("Error generating booking stats report:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({
       message: "Server error while generating booking stats report.",
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
-
 
 

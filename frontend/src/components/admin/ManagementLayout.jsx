@@ -174,7 +174,9 @@ export default function ManagementLayout() {
   const theme = useTheme();
   const navigate = useNavigate();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const { user, logout } = useAuth();
+  
+  // Updated to destructure forceLogoutUser from useAuth
+  const { user, logout, forceLogoutUser } = useAuth();
 
   // Drawer state: mobile open, desktop open/collapsed
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -198,10 +200,12 @@ export default function ManagementLayout() {
   const handleMenuClose = () => setAnchorEl(null);
   const handleLogoutClick = () => setLogoutConfirmOpen(true);
 
+  // Updated confirmLogout function
   const confirmLogout = () => {
-    logout();
+    // Use forceLogoutUser for complete session cleanup
+    forceLogoutUser();
     setLogoutConfirmOpen(false);
-    navigate('/auth/login');
+    navigate('/admin/login');
   };
 
   // Compute drawer width based on desktop open state

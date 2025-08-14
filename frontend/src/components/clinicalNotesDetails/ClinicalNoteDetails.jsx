@@ -132,15 +132,6 @@ const PatientInfoCard = styled(Card)(({ theme }) => ({
   marginBottom: theme.spacing(2),
 }));
 
-const ResponsiveGrid = styled(Grid)(({ theme }) => ({
-  [theme.breakpoints.down('lg')]: {
-    '& .MuiGrid-item': {
-      paddingLeft: theme.spacing(1),
-      paddingRight: theme.spacing(1),
-    },
-  },
-}));
-
 const ClinicalNoteDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -148,7 +139,6 @@ const ClinicalNoteDetailPage = () => {
   const { user } = useAuth();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
 
   const mode = location.state?.mode || (id === 'new' ? 'create' : 'view');
   const isReadOnly = mode === 'view';
@@ -160,9 +150,10 @@ const ClinicalNoteDetailPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [saveFieldName, setSaveFieldName] = useState(null);
-  const [bookings, setBookings] = useState([]);
+  const [markingsLoading, setMarkingsLoading] = useState(false);
   const { bookingId, booking } = location.state || {};
   const { therapistId, therapist } = location.state || {};
+
   const [formData, setFormData] = useState({
     therapistId: booking?.therapistId || therapistId,
     bookingId: bookingId,
@@ -181,13 +172,35 @@ const ClinicalNoteDetailPage = () => {
     skeletal: []
   });
 
-  // Update when markings change
-  const handleMarkingsChange = (newMarkings) => {
-    setAnatomicalMarkings(newMarkings);
-    // console.log('Markings updated in parent:', newMarkings); // Debug log
-  };
+  // FIXED: Fetch anatomical markings when loading existing note
+  const fetchAnatomicalMarkings = useCallback(async (clinicalNoteId) => {
+    if (!clinicalNoteId) return;
 
-  // Fetch clinical note details
+    setMarkingsLoading(true);
+    try {
+      console.log('Fetching anatomical markings for note:', clinicalNoteId);
+      const response = await apiClient.get(`/anatomical-markings/${clinicalNoteId}`);
+      console.log('Fetched markings:', response.data);
+
+      if (response.data && response.data.markings) {
+        setAnatomicalMarkings(response.data.markings);
+        console.log('Anatomical markings loaded successfully');
+      }
+    } catch (err) {
+      console.error('Failed to load anatomical markings:', err);
+      // Don't show error to user for markings, just log it
+    } finally {
+      setMarkingsLoading(false);
+    }
+  }, []);
+
+  // Update when markings change
+  const handleMarkingsChange = useCallback((newMarkings) => {
+    console.log('Markings updated in parent:', newMarkings);
+    setAnatomicalMarkings(newMarkings);
+  }, []);
+
+  // FIXED: Fetch clinical note details and anatomical markings
   const fetchClinicalNote = useCallback(async () => {
     if (isNewNote) {
       setLoading(false);
@@ -197,39 +210,33 @@ const ClinicalNoteDetailPage = () => {
     setLoading(true);
     setError(null);
     try {
+      console.log('Fetching clinical note:', id);
       const response = await apiClient.get(`/clinical-notes/${id}`);
-      setNote(response.data);
+      const noteData = response.data;
+
+      setNote(noteData);
       setFormData({
-        bookingId: response.data.bookingId || '',
-        subjective: response.data.subjective || '',
-        objective: response.data.objective || '',
-        assessment: response.data.assessment || '',
-        plan: response.data.plan || '',
-        generalNotes: response.data.generalNotes || '',
+        bookingId: noteData.bookingId || '',
+        subjective: noteData.subjective || '',
+        objective: noteData.objective || '',
+        assessment: noteData.assessment || '',
+        plan: noteData.plan || '',
+        generalNotes: noteData.generalNotes || '',
       });
+
+      // CRITICAL FIX: Fetch anatomical markings for existing notes
+      await fetchAnatomicalMarkings(noteData.id);
+
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load clinical note.');
     } finally {
       setLoading(false);
     }
-  }, [id, isNewNote]);
-
-  // Fetch therapist's bookings for note creation
-  const fetchTherapistBookings = useCallback(async () => {
-    if (!isNewNote || user.role !== 'therapist') return;
-
-    try {
-      const response = await apiClient.get(`/bookings/therapist/${user.id}?status=Confirmed`);
-      setBookings(response.data.bookings || []);
-    } catch (err) {
-      console.error("Failed to load therapist bookings:", err);
-    }
-  }, [isNewNote, user.role, user.id]);
+  }, [id, isNewNote, fetchAnatomicalMarkings]);
 
   useEffect(() => {
     fetchClinicalNote();
-    fetchTherapistBookings();
-  }, [fetchClinicalNote, fetchTherapistBookings]);
+  }, [fetchClinicalNote]);
 
   useEffect(() => {
     if (booking?.therapistId && !formData.therapistId) {
@@ -277,109 +284,224 @@ const ClinicalNoteDetailPage = () => {
     }
   };
 
+  // FIXED: Improved save function with better error handling and anatomical markings sync
   const handleManualSave = async () => {
     if (!formData.assessment || formData.assessment.trim().length < 10) {
       setError('Assessment is required and must be at least 10 characters');
       return;
     }
 
+    console.log('Starting save process...');
     setIsSaving(true);
     setSaveStatus('saving');
     setError(null);
 
     try {
       if (isNewNote) {
-        // console.log('Saving new note with markings:', anatomicalMarkings);
-        // console.log('Form data before save:', formData);
-        // console.log('User data:', user);
-        // console.log('Booking data:', booking);
+        console.log('Creating new completed note...');
 
-        // Ensure we have all required data
-        if (!booking?.therapistId) {
-          throw new Error('Therapist ID is missing from booking data');
-        }
-
-        if (!booking?.clientId) {
-          throw new Error('Client ID is missing from booking data');
+        if (!booking?.therapistId || !booking?.clientId) {
+          throw new Error('Missing booking information');
         }
 
         const payload = {
           clinicalNoteData: {
             ...formData,
-            therapistId: booking.therapistId, // Use the therapistId from booking, not current user
+            therapistId: booking.therapistId,
             clientId: booking.clientId,
-            bookingId: bookingId || formData.bookingId
+            bookingId: bookingId || formData.bookingId,
           },
           anatomicalMarkings
         };
 
-        // console.log('Payload being sent:', payload);
-
+        console.log('Creating note with payload:', payload);
         const response = await apiClient.post('/clinical-notes/complete', payload);
-
-        // console.log('Save response:', response.data);
+        console.log('Note creation response:', response.data);
 
         if (response.data.success) {
+          console.log('New note created successfully, navigating...');
+          // FIXED: Clear states before navigation
+          setIsSaving(false);
+          setSaveStatus('success');
+
+          // Navigate with replace to prevent back issues
           navigate(`/admin/clinical-notes/${response.data.note.id}`, {
             state: {
               mode: 'view',
               refresh: true,
-              successMessage: `Clinical note created successfully with ${response.data.markingsCreated} markings`
-            }
+              successMessage: `Session completed successfully with ${response.data.markingsCreated} anatomical markings`
+            },
+            replace: true
           });
+          return; // Exit early
         }
       } else {
-        // For existing notes - update clinical note first
+        console.log('Updating and completing existing note...');
+
+        // Step 1: Update clinical note data
+        console.log('Updating note fields...');
         await apiClient.put(`/clinical-notes/${note.id}`, formData);
+        console.log('Note fields updated');
 
-        // Then sync anatomical markings
-        const markingsResponse = await apiClient.post(
-          `/anatomical-markings/${note.id}/bulk-sync`,
-          { markings: anatomicalMarkings }
-        );
+        // Step 2: Sync anatomical markings
+        console.log('Syncing anatomical markings...');
+        await apiClient.post(`/anatomical-markings/${note.id}/bulk-sync`, {
+          markings: anatomicalMarkings
+        });
+        console.log('Anatomical markings synced');
 
-        setSaveStatus('success');
+        // Step 3: Mark as completed
+        console.log('Marking note as completed...');
+        const completionResponse = await apiClient.patch(`/clinical-notes/${note.id}/complete`);
+        console.log('Completion response:', completionResponse.data);
 
-        // Optional: Refresh data after successful update
-        fetchClinicalNote();
+        if (completionResponse.data.success) {
+          console.log('Note completed successfully, navigating...');
+          // FIXED: Clear states before navigation
+          setIsSaving(false);
+          setSaveStatus('success');
+
+          // Navigate to view mode
+          navigate(`/admin/clinical-notes/${note.id}`, {
+            state: {
+              mode: 'view',
+              refresh: true,
+              successMessage: 'Session completed successfully'
+            },
+            replace: true
+          });
+          return; // Exit early
+        }
       }
     } catch (err) {
-      console.error('Save failed:', err);
+      console.error('Save operation failed:', err);
+
+      // FIXED: Always clear saving state on error
+      setIsSaving(false);
       setSaveStatus('error');
 
-      // Enhanced error handling
       const errorMessage = err.response?.data?.message ||
-        err.response?.data?.error?.message ||
         err.message ||
-        'Failed to save clinical note';
+        'Failed to complete session';
 
+      console.error('Error message:', errorMessage);
       setError(errorMessage);
-
-      // Specific handling for validation errors
-      if (err.response?.data?.errors) {
-        setError(err.response.data.errors.join(', '));
-      }
-    } finally {
-      setIsSaving(false);
-
-      // Clear status after delay for existing notes
-      if (!isNewNote) {
-        setTimeout(() => setSaveStatus(null), 2000);
-      }
     }
+
+    // FIXED: Failsafe - ensure saving state is cleared
+    setTimeout(() => {
+      if (isSaving) {
+        console.log('Failsafe: Clearing stuck saving state');
+        setIsSaving(false);
+        setSaveStatus(null);
+      }
+    }, 1000);
   };
+
+  // useEffect to prevent memory leaks and handle component unmount
+  useEffect(() => {
+    return () => {
+      console.log('Component unmounting, clearing states');
+      setIsSaving(false);
+      setSaveStatus(null);
+      setError(null);
+    };
+  }, []);
+
+  //useEffect to handle navigation state changes
+  useEffect(() => {
+    // If we have a success message from navigation, show it briefly
+    if (location.state?.successMessage) {
+      setSaveStatus('success');
+      setTimeout(() => {
+        setSaveStatus(null);
+        // Clear the state to prevent it from showing again
+        window.history.replaceState({}, document.title);
+      }, 3000);
+    }
+  }, [location.state]);
+
+
+  
+// FIXED: Better button state management
+const getButtonProps = () => {
+  if (note?.completed) {
+    return {
+      text: 'Session Completed',
+      disabled: true,
+      color: 'success',
+      icon: <CheckCircleOutline />
+    };
+  }
+  
+  if (isSaving) {
+    return {
+      text: 'Completing Session...',
+      disabled: true,
+      color: 'primary',
+      icon: <CircularProgress size={16} />
+    };
+  }
+  
+  const hasValidAssessment = formData.assessment && formData.assessment.trim().length >= 10;
+  
+  return {
+    text: 'Complete Session',
+    disabled: !hasValidAssessment,
+    color: 'primary',
+    icon: <Save />
+  };
+};
+
+// In your JSX, update the button:
+const buttonProps = getButtonProps();
+
+{!isReadOnly && (
+  <ActionButton
+    variant="contained"
+    startIcon={buttonProps.icon}
+    onClick={handleManualSave}
+    disabled={buttonProps.disabled}
+    color={buttonProps.color}
+    fullWidth={isMobile}
+  >
+    {buttonProps.text}
+  </ActionButton>
+)}
+
+  // FIXED: Update the button text and disabled state logic
+  const getButtonText = () => {
+    if (isSaving) return 'Completing...';
+    if (isNewNote) return 'Complete Session';
+    if (note?.completed) return 'Session Completed';
+    return 'Complete Session';
+  };
+
+  const isButtonDisabled = () => {
+    if (isSaving) return true;
+    if (note?.completed) return true;
+    if (!formData.assessment || formData.assessment.trim().length < 10) return true;
+    return false;
+  };
+
+  // In the JSX, update the button:
+  {
+    !isReadOnly && (
+      <ActionButton
+        variant="contained"
+        startIcon={isSaving ? <CircularProgress size={16} /> : <Save />}
+        onClick={handleManualSave}
+        disabled={isButtonDisabled()}
+        fullWidth={isMobile}
+        color={note?.completed ? 'success' : 'primary'}
+      >
+        {getButtonText()}
+      </ActionButton>
+    )
+  }
+
   const handleBack = () => {
     navigate('/admin/clinical-notes', { state: { refresh: true } });
-  };
-
-  const canModifyNote = (note) => {
-    if (!note || !user) return false;
-    if (user.role === 'admin') return true;
-    if (user.role === 'staff') return true;
-    if (user.role === 'therapist') {
-      return note.therapistId === user.id;
-    }
-    return false;
   };
 
   if (loading) {
@@ -397,6 +519,11 @@ const ClinicalNoteDetailPage = () => {
           <Typography variant="h6" color="text.secondary" fontWeight={500}>
             Loading Clinical Note...
           </Typography>
+          {markingsLoading && (
+            <Typography variant="body2" color="text.secondary">
+              Loading anatomical markings...
+            </Typography>
+          )}
         </Box>
       </ModernContainer>
     );
@@ -516,6 +643,9 @@ const ClinicalNoteDetailPage = () => {
           <CardContent sx={{ p: { xs: 2, md: 3 }, flexGrow: 1 }}>
             <Typography variant="h5" fontWeight={700} gutterBottom sx={{ mb: 3 }}>
               Anatomical Markings
+              {markingsLoading && (
+                <CircularProgress size={20} sx={{ ml: 2 }} />
+              )}
             </Typography>
 
             <Box sx={{
@@ -533,6 +663,7 @@ const ClinicalNoteDetailPage = () => {
             </Box>
           </CardContent>
         </SectionCard>
+
         <SectionCard>
           <CardContent sx={{ p: { xs: 2, md: 3 }, flexGrow: 1 }}>
             <Typography variant="h5" fontWeight={700} gutterBottom sx={{ mb: 3 }}>
@@ -699,4 +830,3 @@ const ClinicalNoteDetailPage = () => {
 };
 
 export default ClinicalNoteDetailPage;
-

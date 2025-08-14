@@ -12,33 +12,36 @@ exports.createPaymentIntent = async (req, res) => {
 
     // Validate required fields
     if (!amount || amount <= 0) {
-      return res.status(400).json({ 
-        message: 'Amount is required and must be greater than 0' 
+      return res.status(400).json({
+        message: 'Amount is required and must be greater than 0'
       });
     }
 
     if (!bookingData || !bookingData.serviceOptionId) {
-      return res.status(400).json({ 
-        message: 'Booking data with service option ID is required' 
+      return res.status(400).json({
+        message: 'Booking data with service option ID is required'
       });
     }
 
     // Verify service option exists and is active
     const serviceOption = await ServiceOption.findByPk(bookingData.serviceOptionId, {
-      include: { model: Service }
+      include: {
+        model: Service,
+        as: 'service'
+      }
     });
 
     if (!serviceOption || !serviceOption.isActive) {
-      return res.status(404).json({ 
-        message: 'Service option not found or inactive' 
+      return res.status(404).json({
+        message: 'Service option not found or inactive'
       });
     }
 
     // Verify amount matches service option price (security check)
     const expectedAmount = Math.round(parseFloat(serviceOption.price) * 100);
     if (Math.abs(amount - expectedAmount) > 1) { // Allow for minor rounding differences
-      return res.status(400).json({ 
-        message: 'Payment amount does not match service price' 
+      return res.status(400).json({
+        message: 'Payment amount does not match service price'
       });
     }
 
@@ -51,13 +54,13 @@ exports.createPaymentIntent = async (req, res) => {
       },
       metadata: {
         service_option_id: bookingData.serviceOptionId,
-        service_name: serviceOption.Service?.name || 'Unknown Service',
+        service_name: serviceOption.service?.name || 'Unknown Service', // FIXED: Updated property access
         client_email: bookingData.clientInfo?.email || 'Unknown',
         booking_date: bookingData.dateTime?.date || 'Unknown',
         booking_time: bookingData.dateTime?.time || 'Unknown',
         ...metadata
       },
-      description: `Booking for ${serviceOption.Service?.name || 'Service'} - ${serviceOption.optionName || 'Standard Session'}`,
+      description: `Booking for ${serviceOption.service?.name || 'Service'} - ${serviceOption.optionName || 'Standard Session'}`, // FIXED: Updated property access
     });
 
     // Store payment intent in database for tracking
@@ -84,15 +87,15 @@ exports.createPaymentIntent = async (req, res) => {
 
   } catch (error) {
     console.error('Error creating payment intent:', error);
-    
+
     if (error.type === 'StripeCardError' || error.type === 'StripeInvalidRequestError') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: error.message,
-        type: error.type 
+        type: error.type
       });
     }
 
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to create payment intent',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -114,15 +117,15 @@ exports.confirmPayment = async (req, res) => {
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
     if (paymentIntent.status !== 'succeeded') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Payment has not been completed successfully',
-        status: paymentIntent.status 
+        status: paymentIntent.status
       });
     }
 
     // Update payment record in database
-    const payment = await Payment.findOne({ 
-      where: { stripePaymentIntentId: paymentIntentId } 
+    const payment = await Payment.findOne({
+      where: { stripePaymentIntentId: paymentIntentId }
     });
 
     if (payment) {
@@ -158,7 +161,7 @@ exports.confirmPayment = async (req, res) => {
 
   } catch (error) {
     console.error('Error confirming payment:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to confirm payment',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -247,17 +250,27 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
             const { sendBookingDetailsEmail } = require('../services/emailService');
             const bookingWithDetails = await Booking.findByPk(booking.id, {
               include: [
-                { model: Client },
-                { model: ServiceOption, include: [{ model: Service }] }
+                {
+                  model: Client,
+                  as: 'client' // FIXED: Added alias
+                },
+                {
+                  model: ServiceOption,
+                  as: 'serviceOption', // FIXED: Added alias
+                  include: [{
+                    model: Service,
+                    as: 'service' // FIXED: Added alias
+                  }]
+                }
               ]
             });
 
             if (bookingWithDetails) {
               await sendBookingDetailsEmail(
                 bookingWithDetails,
-                bookingWithDetails.Client,
-                bookingWithDetails.ServiceOption,
-                bookingWithDetails.ServiceOption.Service
+                bookingWithDetails.client,
+                bookingWithDetails.serviceOption,
+                bookingWithDetails.serviceOption.service
               );
             }
           }
@@ -359,7 +372,7 @@ async function handleChargeDispute(dispute) {
         if (booking) {
           await booking.update({
             paymentStatus: 'Disputed',
-            internalNotes: (booking.internalNotes || '') + 
+            internalNotes: (booking.internalNotes || '') +
               `\n[${new Date().toISOString()}] Payment disputed: ${dispute.reason}`
           });
         }
@@ -386,7 +399,14 @@ exports.processRefund = async (req, res) => {
     // Get payment from database
     const payment = await Payment.findOne({
       where: { stripePaymentIntentId: paymentIntentId },
-      include: [{ model: Booking, include: [{ model: Client }] }]
+      include: [{
+        model: Booking,
+        as: 'booking',
+        include: [{
+          model: Client,
+          as: 'client'
+        }]
+      }]
     });
 
     if (!payment) {
@@ -400,7 +420,7 @@ exports.processRefund = async (req, res) => {
     // Calculate refund amount in dollars (your model uses DECIMAL)
     const refundAmountInDollars = amount ? (amount / 100) : parseFloat(payment.amount);
     const refundAmountInCents = Math.round(refundAmountInDollars * 100); // Convert back to cents for Stripe
-    
+
     if (refundAmountInDollars > parseFloat(payment.amount)) {
       return res.status(400).json({ message: 'Refund amount cannot exceed original payment' });
     }
@@ -420,7 +440,7 @@ exports.processRefund = async (req, res) => {
     const currentRefundAmount = parseFloat(payment.refundAmount || 0);
     const newRefundAmount = currentRefundAmount + refundAmountInDollars;
     const isPartialRefund = newRefundAmount < parseFloat(payment.amount);
-    
+
     await payment.update({
       status: isPartialRefund ? 'Partially Refunded' : 'Refunded',
       refundAmount: newRefundAmount.toFixed(2),
@@ -429,8 +449,8 @@ exports.processRefund = async (req, res) => {
     });
 
     // Update booking if exists
-    if (payment.Booking) {
-      await payment.Booking.update({
+    if (payment.booking) {
+      await payment.booking.update({
         paymentStatus: isPartialRefund ? 'Partially Refunded' : 'Refunded'
       });
     }
@@ -449,15 +469,15 @@ exports.processRefund = async (req, res) => {
 
   } catch (error) {
     console.error('Error processing refund:', error);
-    
+
     if (error.type === 'StripeInvalidRequestError') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: error.message,
-        type: error.type 
+        type: error.type
       });
     }
 
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to process refund',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
@@ -474,12 +494,23 @@ exports.getPaymentDetails = async (req, res) => {
     const payment = await Payment.findOne({
       where: { stripePaymentIntentId: paymentIntentId },
       include: [
-        { 
-          model: Booking, 
+        {
+          model: Booking,
+          as: 'booking',
           include: [
-            { model: Client },
-            { model: ServiceOption, include: [{ model: Service }] }
-          ] 
+            {
+              model: Client,
+              as: 'client'
+            },
+            {
+              model: ServiceOption,
+              as: 'serviceOption',
+              include: [{
+                model: Service,
+                as: 'service'
+              }]
+            }
+          ]
         }
       ]
     });
@@ -501,7 +532,7 @@ exports.getPaymentDetails = async (req, res) => {
         method: payment.method,
         paidAt: payment.paidAt,
         refundAmount: payment.refundAmount,
-        booking: payment.Booking
+        booking: payment.booking
       },
       stripeStatus: paymentIntent.status,
       stripeAmount: paymentIntent.amount
@@ -509,7 +540,7 @@ exports.getPaymentDetails = async (req, res) => {
 
   } catch (error) {
     console.error('Error getting payment details:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to get payment details',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });

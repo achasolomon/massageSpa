@@ -4,7 +4,7 @@ import axios from 'axios';
 // In development, this might point to localhost:5001 (or whatever port the backend runs on)
 // In production, this will point to the deployed backend URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/v1';
-// const API_BASE_URL = 'https://spa-api.algosoftwarelabs.com/api/v1';
+//const API_BASE_URL = 'https://spa-api.algosoftwarelabs.com/api/v1';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -19,7 +19,7 @@ apiClient.interceptors.request.use(
     // Retrieve the token from local storage (or session storage/memory)
     const token = localStorage.getItem('authToken'); 
     if (token) {
-      config.headers['Authorization'] = `${token}`; // Assumes token includes 'Bearer '
+      config.headers['Authorization'] = `${token}`;
     }
     return config;
   },

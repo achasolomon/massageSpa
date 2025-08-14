@@ -164,7 +164,7 @@ exports.createBooking = async (req, res) => {
     const serviceOption = await ServiceOption.findByPk(serviceOptionId, {
       include: { model: Service, attributes: ["id", "name"] },
       transaction
-    }); 
+    });
     if (!serviceOption || !serviceOption.isActive) {
       await transaction.rollback();
       return res.status(404).json({ message: "Service option not found or is inactive." });
@@ -175,7 +175,7 @@ exports.createBooking = async (req, res) => {
 
     // 3. Parse and Calculate Start/End Times
     let bookingStart;
-    
+
     if (bookingTime instanceof Date) {
       bookingStart = bookingTime;
     } else if (typeof bookingTime === 'string') {
@@ -194,7 +194,7 @@ exports.createBooking = async (req, res) => {
 
     const bookingEnd = addMinutes(bookingStart, serviceDuration);
     const bookingDateStr = bookingStart.toISOString().split('T')[0];
-    
+
     const utcHours = bookingStart.getUTCHours();
     const utcMinutes = bookingStart.getUTCMinutes();
     const utcSeconds = bookingStart.getUTCSeconds();
@@ -219,7 +219,7 @@ exports.createBooking = async (req, res) => {
 
     if (availabilityRules.length === 0) {
       await transaction.rollback();
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "No availability found for the selected service and time slot."
       });
     }
@@ -256,16 +256,16 @@ exports.createBooking = async (req, res) => {
 
     // 6. ENHANCED PAYMENT HANDLING
     let paymentResult = { status: "Not Applicable", paymentRecord: null };
-    
+
     if (paymentMethod === "credit_card" || paymentMethod === "Credit Card") {
       try {
         // Verify Stripe payment was completed
         const paymentIntent = await stripe.paymentIntents.retrieve(paymentDetails.stripePaymentIntentId);
-        
+
         if (paymentIntent.status !== 'succeeded') {
           await transaction.rollback();
-          return res.status(400).json({ 
-            message: `Payment not completed. Status: ${paymentIntent.status}` 
+          return res.status(400).json({
+            message: `Payment not completed. Status: ${paymentIntent.status}`
           });
         }
 
@@ -273,8 +273,8 @@ exports.createBooking = async (req, res) => {
         const expectedAmountInCents = Math.round(parseFloat(priceAtBooking) * 100);
         if (Math.abs(paymentIntent.amount - expectedAmountInCents) > 1) {
           await transaction.rollback();
-          return res.status(400).json({ 
-            message: "Payment amount does not match booking price." 
+          return res.status(400).json({
+            message: "Payment amount does not match booking price."
           });
         }
 
@@ -319,7 +319,7 @@ exports.createBooking = async (req, res) => {
         newBooking.paymentStatus = "Paid";
         newBooking.status = "Confirmed";
         await newBooking.save({ transaction });
-        
+
         paymentResult = {
           status: "Completed",
           paymentRecord: paymentRecord
@@ -328,8 +328,8 @@ exports.createBooking = async (req, res) => {
       } catch (stripeError) {
         await transaction.rollback();
         console.error('Stripe verification error:', stripeError);
-        return res.status(400).json({ 
-          message: "Failed to verify payment with Stripe: " + stripeError.message 
+        return res.status(400).json({
+          message: "Failed to verify payment with Stripe: " + stripeError.message
         });
       }
 
@@ -427,12 +427,12 @@ exports.createBooking = async (req, res) => {
   } catch (error) {
     await transaction.rollback();
     console.error("Error creating booking:", error);
-    
+
     if (error.name === "SequelizeValidationError" || error.name === "SequelizeUniqueConstraintError") {
       const messages = error.errors ? error.errors.map(err => err.message) : [error.message];
       return res.status(400).json({ message: "Validation Error", errors: messages });
     }
-    
+
     res.status(500).json({ message: "Server error while creating booking." });
   }
 };
@@ -459,10 +459,10 @@ exports.updateBooking = async (req, res) => {
     // 1. Find the booking with all necessary associations
     const booking = await Booking.findByPk(id, {
       include: [
-        { model: Client },
-        { model: ServiceOption, include: [{ model: Service }] },
-        { model: Therapist, include: [{ model: User }], required: false },
-        { model: Payment }
+        { model: Client, as: 'client' }, // ADD ALIAS
+        { model: ServiceOption, as: 'serviceOption', include: [{ model: Service, as: 'service' }] }, // ADD ALIASES
+        { model: Therapist, as: 'therapist', include: [{ model: User, as: 'user' }], required: false }, // ADD ALIASES
+        { model: Payment, as: 'payment' } // ADD ALIAS
       ],
       transaction
     });
@@ -492,8 +492,14 @@ exports.updateBooking = async (req, res) => {
 
     // 2. Validate and update time/therapist/service if changed
     let newServiceOptionId = serviceOptionId || booking.serviceOptionId;
-    let newTherapistId = (therapistId !== undefined) ? therapistId : booking.therapistId;
-    
+    let newTherapistId;
+    if (therapistId === undefined) {
+      newTherapistId = booking.therapistId; // no change
+    } else if (therapistId === null || therapistId === '') {
+      newTherapistId = null; // explicitly clear therapist
+    } else {
+      newTherapistId = therapistId; // keep provided UUID
+    }
     let newBookingTime;
     if (bookingTime) {
       if (typeof bookingTime === 'string') {
@@ -501,7 +507,7 @@ exports.updateBooking = async (req, res) => {
       } else {
         newBookingTime = new Date(bookingTime);
       }
-      
+
       if (!isValid(newBookingTime)) {
         await transaction.rollback();
         return res.status(400).json({ message: "Invalid booking time format." });
@@ -522,7 +528,7 @@ exports.updateBooking = async (req, res) => {
       }
 
       const serviceDuration = serviceOption.duration;
-      
+
       // Update booking fields
       booking.serviceOptionId = newServiceOptionId;
       booking.therapistId = newTherapistId;
@@ -561,7 +567,7 @@ exports.updateBooking = async (req, res) => {
 
         if (availabilityRules.length === 0) {
           await transaction.rollback();
-          return res.status(400).json({ 
+          return res.status(400).json({
             message: "No availability found for the selected service and time slot."
           });
         }
@@ -580,8 +586,8 @@ exports.updateBooking = async (req, res) => {
 
         if (currentBookingCount >= totalCapacity) {
           await transaction.rollback();
-          return res.status(400).json({ 
-            message: "This time slot is fully booked." 
+          return res.status(400).json({
+            message: "This time slot is fully booked."
           });
         }
       }
@@ -591,7 +597,7 @@ exports.updateBooking = async (req, res) => {
         const therapistExists = await Therapist.findByPk(newTherapistId, { transaction });
         if (!therapistExists) {
           await transaction.rollback();
-          return res.status(400).json({ 
+          return res.status(400).json({
             message: "Selected therapist does not exist."
           });
         }
@@ -610,8 +616,8 @@ exports.updateBooking = async (req, res) => {
         // Allow up to 5 concurrent bookings per therapist per time slot (adjust as needed)
         if (therapistBookingCount >= 5) {
           await transaction.rollback();
-          return res.status(400).json({ 
-            message: "Selected therapist is overbooked for this time slot." 
+          return res.status(400).json({
+            message: "Selected therapist is overbooked for this time slot."
           });
         }
       }
@@ -639,7 +645,7 @@ exports.updateBooking = async (req, res) => {
             status: 'Succeeded',
             paidAt: new Date()
           }, { transaction });
-          
+
           // Auto-confirm booking when payment is marked as paid
           if (booking.status === "Pending Confirmation") {
             booking.status = "Confirmed";
@@ -665,7 +671,11 @@ exports.updateBooking = async (req, res) => {
     if (isTherapistAssigned) {
       try {
         const therapist = await Therapist.findByPk(newTherapistId, {
-          include: { model: User, attributes: ["firstName", "lastName", "email"] },
+          include: { 
+            model: User, 
+            as: 'user',
+            attributes: ["firstName", "lastName", "email"] 
+          },
           transaction
         });
 
@@ -673,9 +683,9 @@ exports.updateBooking = async (req, res) => {
           const therapistEmailResult = await sendTherapistAssignmentEmail(
             booking,
             therapist,
-            booking.Client,
-            booking.ServiceOption,
-            booking.ServiceOption.Service
+            booking.client,
+            booking.serviceOption,
+            booking.serviceOption.service
           );
 
           if (!therapistEmailResult.success) {
@@ -692,10 +702,10 @@ exports.updateBooking = async (req, res) => {
     // 6. Fetch fully updated booking
     const updatedBooking = await Booking.findByPk(id, {
       include: [
-        { model: Client },
-        { model: ServiceOption, include: [{ model: Service }] },
-        { model: Therapist, include: [{ model: User, attributes: ["firstName", "lastName", "email"] }], required: false },
-        { model: Payment }
+        { model: Client, as: 'client' },
+        { model: ServiceOption, as: 'serviceOption', include: [{ model: Service, as: 'service' }] },
+        { model: Therapist, as: 'therapist', include: [{ model: User, attributes: ["firstName", "lastName", "email"] }] },
+        { model: Payment, as: 'payment' }
       ]
     });
 
@@ -709,9 +719,9 @@ exports.updateBooking = async (req, res) => {
       if (status === 'Confirmed' && originalValues.status !== 'Confirmed') {
         await sendBookingDetailsEmail(
           updatedBooking,
-          updatedBooking.Client,
-          updatedBooking.ServiceOption,
-          updatedBooking.ServiceOption.Service
+          updatedBooking.client,
+          updatedBooking.serviceOption,
+          updatedBooking.serviceOption.service
         );
       }
     } catch (emailError) {
@@ -754,9 +764,9 @@ exports.deleteBooking = async (req, res) => {
     // 1. Find the booking with payment information
     const booking = await Booking.findByPk(id, {
       include: [
-        { model: Client },
-        { model: ServiceOption, include: [{ model: Service }] },
-        { model: Payment }
+        { model: Client, as: 'client' },
+        { model: ServiceOption, as: 'serviceOption', include: [{ model: Service, as: 'service' }] },
+        { model: Payment, as: 'payment' }
       ],
       transaction
     });
@@ -780,7 +790,7 @@ exports.deleteBooking = async (req, res) => {
     if (booking.paymentStatus === 'Paid') {
       // Find the successful payment
       const successfulPayment = await Payment.findOne({
-        where: { 
+        where: {
           bookingId: booking.id,
           status: 'Succeeded'
         },
@@ -791,7 +801,7 @@ exports.deleteBooking = async (req, res) => {
         try {
           // Calculate refund amount based on timing
           const refundAmount = calculateRefundAmount(booking);
-          
+
           if (refundAmount > 0) {
             // Process Stripe refund
             const refund = await stripe.refunds.create({
@@ -896,10 +906,10 @@ function calculateRefundAmount(booking) {
   const now = new Date();
   const bookingTime = new Date(booking.bookingStartTime);
   const hoursUntilAppointment = (bookingTime - now) / (1000 * 60 * 60);
-  
+
   // Convert price to cents for Stripe
   const fullAmountInCents = Math.round(parseFloat(booking.priceAtBooking) * 100);
-  
+
   // Cancellation policy:
   // - More than 24 hours: Full refund
   // - 12-24 hours: 50% refund
@@ -942,13 +952,38 @@ exports.getAllBookings = async (req, res) => {
   }
 
   try {
+
     const { count, rows } = await Booking.findAndCountAll({
       where: whereClause,
       include: [
-        { model: Client, attributes: ["id", "firstName", "lastName", "email"] },
-        { model: ServiceOption, include: [{ model: Service, attributes: ["id", "name"] }] },
-        { model: Therapist, include: [{ model: User, attributes: ["firstName", "lastName"] }], required: false },
-        { model: Payment } // Include payment information
+        {
+          model: Client,
+          as: 'client', // ADD THIS ALIAS
+          attributes: ["id", "firstName", "lastName", "email"]
+        },
+        {
+          model: ServiceOption,
+          as: 'serviceOption', // ADD THIS ALIAS
+          include: [{
+            model: Service,
+            as: 'service', // ADD THIS ALIAS
+            attributes: ["id", "name"]
+          }]
+        },
+        {
+          model: Therapist,
+          as: 'therapist', // ADD THIS ALIAS
+          include: [{
+            model: User,
+            as: 'user', // ADD THIS ALIAS
+            attributes: ["firstName", "lastName"]
+          }],
+          required: false
+        },
+        {
+          model: Payment,
+          as: 'payment' // ADD THIS ALIAS
+        }
       ],
       order: [["bookingStartTime", "DESC"]],
       limit: parseInt(limit),
@@ -975,10 +1010,32 @@ exports.getBookingById = async (req, res) => {
   try {
     const booking = await Booking.findByPk(id, {
       include: [
-        { model: Client },
-        { model: ServiceOption, include: [{ model: Service }] },
-        { model: Therapist, include: [{ model: User, attributes: ["id", "firstName", "lastName"] }], required: false },
-        { model: Payment } // Include payment information
+        {
+          model: Client,
+          as: 'client' // ADD THIS ALIAS
+        },
+        {
+          model: ServiceOption,
+          as: 'serviceOption', // ADD THIS ALIAS
+          include: [{
+            model: Service,
+            as: 'service' // ADD THIS ALIAS
+          }]
+        },
+        {
+          model: Therapist,
+          as: 'therapist', // ADD THIS ALIAS
+          include: [{
+            model: User,
+            as: 'user', // ADD THIS ALIAS
+            attributes: ["id", "firstName", "lastName"]
+          }],
+          required: false
+        },
+        {
+          model: Payment,
+          as: 'payment' // ADD THIS ALIAS
+        }
       ]
     });
 
@@ -1001,7 +1058,7 @@ exports.getBookingById = async (req, res) => {
   }
 };
 
-// Keep all other existing methods unchanged...
+// get booking for particular therapist
 exports.getTherapistBookings = async (req, res) => {
   try {
     const { therapistId } = req.params;
@@ -1027,14 +1084,17 @@ exports.getTherapistBookings = async (req, res) => {
     const includeOptions = [
       {
         model: Client,
+        as: 'client',
         attributes: ['id', 'firstName', 'lastName', 'email']
       },
       {
         model: ServiceOption,
-        include: [{ model: Service, attributes: ['id', 'name'] }]
+        as: 'serviceOption',
+        include: [{ model: Service, as: 'service', attributes: ['id', 'name'] }]
       },
       {
-        model: Payment // Include payment information
+        model: Payment,
+        as: 'payment'
       }
     ];
 
@@ -1107,21 +1167,26 @@ exports.getClientBookings = async (req, res) => {
       include: [
         {
           model: Therapist,
+          as: 'therapist', // ADD ALIAS
           include: {
             model: User,
+            as: 'user', // ADD ALIAS
             attributes: ['firstName', 'lastName', 'email']
           }
         },
         {
           model: ServiceOption,
-          include: [{ model: Service, attributes: ['id', 'name'] }]
+          as: 'serviceOption',
+          include: [{ model: Service, as: 'service', attributes: ['id', 'name'] }]
         },
         {
           model: ClinicalNote,
+          as: 'clinicalNote',
           attributes: ['id', 'completed']
         },
         {
-          model: Payment // Include payment information
+          model: Payment,
+          as: 'payment'
         }
       ],
       limit: parseInt(limit),
@@ -1161,20 +1226,24 @@ exports.getBookingsWithoutCompletedNotes = async (req, res) => {
       include: [
         {
           model: Client,
+          as: 'client',
           attributes: ['id', 'firstName', 'lastName', 'email']
         },
         {
           model: ServiceOption,
+          as: 'serviceOption',  
           attributes: ['id', 'duration', 'price'],
           include: [
             {
               model: Service,
+              as: 'service',
               attributes: ['id', 'name', 'description']
             }
           ]
         },
         {
           model: ClinicalNote,
+          as: 'clinicalNote',
           required: false,
           where: {
             [Op.or]: [
@@ -1184,7 +1253,8 @@ exports.getBookingsWithoutCompletedNotes = async (req, res) => {
           }
         },
         {
-          model: Payment // Include payment information
+          model: Payment,
+          as: 'payment'
         }
       ],
       limit: parseInt(limit),
@@ -1232,10 +1302,12 @@ exports.getBookingsReadyForNotes = async (req, res) => {
       include: [
         {
           model: Client,
+          as: 'client',
           attributes: ['id', 'firstName', 'lastName', 'email']
         },
         {
           model: Therapist,
+          as: 'therapist',
           include: {
             model: User,
             attributes: ['firstName', 'lastName']
@@ -1243,20 +1315,24 @@ exports.getBookingsReadyForNotes = async (req, res) => {
         },
         {
           model: ServiceOption,
+          as: 'serviceOption',
           attributes: ['id', 'duration', 'price'],
           include: [
             {
               model: Service,
+              as: 'service',
               attributes: ['id', 'name', 'description']
             }
           ]
         },
         {
           model: ClinicalNote,
+          as: 'clinicalNote',
           required: false
         },
         {
-          model: Payment // Include payment information
+          model: Payment,
+          as: 'payment'
         }
       ],
       limit: parseInt(limit),
@@ -1275,5 +1351,85 @@ exports.getBookingsReadyForNotes = async (req, res) => {
   } catch (error) {
     console.error('Error getting bookings ready for notes:', error);
     return res.status(500).json({ message: 'Failed to get bookings ready for notes' });
+  }
+};
+
+exports.getReadyForNotes = async (req, res) => {
+  try {
+    console.log('Fetching bookings ready for notes...');
+    console.log('Query params:', req.query);
+
+    const { status, paymentStatus, therapistId, limit = 100 } = req.query;
+
+    const where = {};
+
+    if (status) {
+      where.status = status;
+    }
+
+    if (paymentStatus) {
+      where.paymentStatus = paymentStatus;
+    }
+
+    if (therapistId) {
+      where.therapistId = therapistId;
+    }
+
+    console.log('Where conditions:', where);
+
+    const bookings = await Booking.findAll({
+      where,
+      include: [
+        {
+          model: Client,
+          as: 'client', 
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+          required: false
+        },
+        {
+          model: Therapist,
+          as: 'therapist', 
+          include: [{
+            model: User,
+            as: 'user',
+            attributes: ['firstName', 'lastName'],
+            required: false
+          }],
+          required: false
+        },
+        {
+          model: ClinicalNote,
+          as: 'clinicalNote',
+          required: false
+        },
+        {
+          model: ServiceOption,
+          as: 'serviceOption',
+          include: [{
+            model: Service,
+            as: 'service',
+            attributes: ['name'],
+            required: false
+          }],
+          required: false
+        }
+      ],
+      order: [['bookingStartTime', 'ASC']],
+      limit: parseInt(limit)
+    });
+
+    console.log(`Found ${bookings.length} bookings ready for notes`);
+
+    res.json({
+      success: true,
+      bookings
+    });
+
+  } catch (error) {
+    console.error('Error fetching bookings ready for notes:', error);
+    res.status(500).json({
+      message: 'Failed to fetch bookings ready for notes',
+      error: error.message
+    });
   }
 };

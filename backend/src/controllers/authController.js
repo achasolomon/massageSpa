@@ -14,7 +14,11 @@ exports.loginUser = async (req, res) => {
     // Find user by email, include their role name
     const user = await User.findOne({
       where: { email },
-      include: [{ model: Role, attributes: ["name"] }],
+      include: [{ 
+        model: Role,
+        as: 'role',
+        attributes: ["name"] 
+      }],
     });
 
     if (!user) {
@@ -35,7 +39,7 @@ exports.loginUser = async (req, res) => {
     const payload = {
       id: user.id,
       email: user.email,
-      role: user.Role.name, // Include role name in the token payload
+      role: user.role.name, // Include role name in the token payload
     };
 
     // Sign token
@@ -53,7 +57,7 @@ exports.loginUser = async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        role: user.Role.name,
+        role: user.role.name,
       },
     });
 

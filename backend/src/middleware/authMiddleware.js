@@ -15,7 +15,11 @@ const authenticateToken = async (req, res, next) => {
     
     // Fetch user and role details from DB to ensure user exists and has valid role
     const user = await User.findByPk(decoded.id, {
-        include: [{ model: Role, attributes: ["name"] }] // Include role name
+        include: [{ 
+          model: Role, 
+          as: 'role',
+          attributes: ["name"] 
+        }] 
     });
 
     if (!user || !user.isActive) {
@@ -26,7 +30,7 @@ const authenticateToken = async (req, res, next) => {
     req.user = {
         id: user.id,
         email: user.email,
-        role: user.Role.name // Attach role name
+        role: user.role.name // Attach role name
     };
 
     next(); // Proceed to the next middleware or route handler

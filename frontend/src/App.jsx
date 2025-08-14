@@ -20,6 +20,8 @@ import ClinicalNotesPage from './pages/admin/clinicalNotes/ClinicalNotesPage';
 import ProfilePage from './pages/admin/users/ProfilePage';
 import ConsentForm from './pages/client/ConsentForm';
 import PrivacyPolicy from './pages/client/PrivatePolicy';
+import AdminNewBooking from './pages/admin/bookings/AdminNewBooking';
+import ActivityTracker from './components/ActivityTracker';
 import ClinicalNoteDetailPage from './components/clinicalNotesDetails/ClinicalNoteDetails';
 import SettingsConfigurationPage from './pages/admin/settings/Settings';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
@@ -46,70 +48,73 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={
-          stripePromise ? (
-            <Elements stripe={stripePromise}>
+      <ActivityTracker>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={
+            stripePromise ? (
+              <Elements stripe={stripePromise}>
+                <BookingPage />
+              </Elements>
+            ) : (
               <BookingPage />
-            </Elements>
-          ) : (
-            <BookingPage />
-          )
-        } />
-        <Route path="/admin/login" element={<LoginPage />} />
-        <Route path="admin/signup" element={<SignupPage />} />
-        <Route path="/admin/reports" element={<Navigate to="/admin/reports/revenue" replace />} />
-        {/* Client Consent Form */}
-        <Route path="consent-form/:token" element={<ConsentForm />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        {/* Protected Admin Routes */}
-        <Route
-          path="/admin/*"
-          element={
-            <ProtectedRoute>
-              <ManagementLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardPage />} />
+            )
+          } />
+          <Route path="/admin/login" element={<LoginPage />} />
+          <Route path="admin/signup" element={<SignupPage />} />
+          <Route path="/admin/reports" element={<Navigate to="/admin/reports/revenue" replace />} />
+          {/* Client Consent Form */}
+          <Route path="consent-form/:token" element={<ConsentForm />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          {/* Protected Admin Routes */}
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute>
+                <ManagementLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<DashboardPage />} />
 
-          {/* Users */}
-          <Route path="users" element={<UserListPage />} />
-          <Route path="users/profile" element={<ProfilePage />} />
-          {/* Therapists */}
-          <Route path="therapists" element={<TherapistListPage />} />
+            {/* Users */}
+            <Route path="users" element={<UserListPage />} />
+            <Route path="users/profile" element={<ProfilePage />} />
+            {/* Therapists */}
+            <Route path="therapists" element={<TherapistListPage />} />
 
-          {/* Services */}
-          <Route path="services" element={<ServiceListPage />} />
+            {/* Services */}
+            <Route path="services" element={<ServiceListPage />} />
 
-          {/* Bookings */}
-          <Route path="bookings" element={<BookingListPage />} />
-          <Route path="bookings/:id" element={<BookingEditPage />} />
+            {/* Bookings */}
+            <Route path="bookings" element={<BookingListPage />} />
+            <Route path="bookings/new" element={<AdminNewBooking />} />
+            <Route path="bookings/:id" element={<BookingEditPage />} />
 
-          {/* Reports */}
-          <Route path="reports" element={<Navigate to="revenue" replace />} />
-          <Route path="reports/revenue" element={<RevenueReportPage />} />
-          <Route path="reports/stats" element={<BookingStatsPage />} />
+            {/* Reports */}
+            <Route path="reports" element={<Navigate to="revenue" replace />} />
+            <Route path="reports/revenue" element={<RevenueReportPage />} />
+            <Route path="reports/stats" element={<BookingStatsPage />} />
 
-          {/* Reminders */}
-          <Route path="reminders" element={<RemindersPage />} />
-          {/* Client route */}
-          <Route path="clients" element={<ClientManagementPage />} />
+            {/* Reminders */}
+            <Route path="reminders" element={<RemindersPage />} />
+            {/* Client route */}
+            <Route path="clients" element={<ClientManagementPage />} />
 
-          {/* schedule routes */}
-          <Route path="schedule" element={<ScheduleManagement />} />
-          <Route path="myschedule" element={<MySchedule />} />
-          {/* Clinical Notes */}
-          <Route path="clinical-notes" element={<ClinicalNotesPage />} />
-          <Route path="clinical-notes/:id" element={<ClinicalNoteDetailPage />} />
-          <Route path="admin/clinical-notes/new" element={<ClinicalNoteDetailPage />} />
-          {/* Settings */}
-          <Route path="settings" element={<SettingsConfigurationPage />} />
+            {/* schedule routes */}
+            <Route path="schedule" element={<ScheduleManagement />} />
+            <Route path="myschedule" element={<MySchedule />} />
+            {/* Clinical Notes */}
+            <Route path="clinical-notes" element={<ClinicalNotesPage />} />
+            <Route path="clinical-notes/:id" element={<ClinicalNoteDetailPage />} />
+            <Route path="admin/clinical-notes/new" element={<ClinicalNoteDetailPage />} />
+            {/* Settings */}
+            <Route path="settings" element={<SettingsConfigurationPage />} />
 
-        </Route>
-      </Routes>
+          </Route>
+        </Routes>
+      </ActivityTracker>
     </ThemeProvider>
   );
 }

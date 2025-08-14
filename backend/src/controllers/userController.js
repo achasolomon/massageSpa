@@ -19,17 +19,18 @@ exports.getAllUsers = async (req, res) => {
   try {
     const { count, rows } = await User.findAndCountAll({
       where: whereClause,
-      attributes: { exclude: ["password"] }, // Exclude password hash
+      attributes: { exclude: ["password"] },
       include: [{
         model: Role,
+        as: 'role', // FIXED: Added alias
         attributes: ["name"],
         where: roleWhereClause,
-        required: !!role // Make include required only if role filter is applied
+        required: !!role
       }],
       order: [["lastName", "ASC"], ["firstName", "ASC"]],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      distinct: true, // Needed for correct count with includes
+      distinct: true,
     });
 
     res.json({
@@ -49,7 +50,11 @@ exports.getUserById = async (req, res) => {
   try {
     const user = await User.findByPk(req.params.id, {
       attributes: { exclude: ["password"] },
-      include: [{ model: Role, attributes: ["name"] }],
+      include: [{ 
+        model: Role, 
+        as: 'role', // FIXED: Added alias
+        attributes: ["name"] 
+      }],
     });
     if (!user) {
       return res.status(404).json({ message: "User not found." });
@@ -85,7 +90,7 @@ exports.createUser = async (req, res) => {
       email,
       password,
       roleId,
-      isActive: isActive !== undefined ? isActive : true, // Default to active
+      isActive: isActive !== undefined ? isActive : true,
     });
 
     // If the role is Therapist, create associated Therapist profile
@@ -94,14 +99,18 @@ exports.createUser = async (req, res) => {
         userId: newUser.id,
         specialties: therapistDetails.specializations || [],
         bio: therapistDetails.bio || null,
-        isActive: newUser.isActive, // Match therapist status with user status
+        isActive: newUser.isActive,
       });
     }
 
-    // Fetch the created user data to return (excluding password)
+    // Fetch the created user data - FIXED: Added alias
     const createdUser = await User.findByPk(newUser.id, {
         attributes: { exclude: ["password"] },
-        include: [{ model: Role, attributes: ["name"] }]
+        include: [{ 
+          model: Role, 
+          as: 'role', // FIXED: Added alias
+          attributes: ["name"] 
+        }]
     });
 
     res.status(201).json(createdUser);
@@ -155,14 +164,20 @@ exports.updateUser = async (req, res) => {
 
     await user.save();
 
-    // Update associated therapist details if provided and role is therapist
+    // Update associated therapist details - FIXED: Added alias
     const currentRole = roleName || (await user.getRole()).name;
     if (currentRole === 'therapist' && therapistDetails) {
-        let therapist = await Therapist.findOne({ where: { userId: id } });
+        let therapist = await Therapist.findOne({ 
+          where: { userId: id },
+          include: [{ 
+            model: User, 
+            as: 'user' // FIXED: Added alias
+          }]
+        });
         if (therapist) {
             if (therapistDetails.specializations) therapist.specialties = therapistDetails.specializations;
             if (therapistDetails.bio) therapist.bio = therapistDetails.bio;
-            if (typeof isActive === "boolean") therapist.isActive = isActive; // Keep therapist status synced
+            if (typeof isActive === "boolean") therapist.isActive = isActive;
             await therapist.save();
         } else {
             // If therapist profile doesn't exist, create it
@@ -175,10 +190,14 @@ exports.updateUser = async (req, res) => {
         }
     }
 
-    // Fetch updated user data to return (excluding password)
+    // Fetch updated user data - FIXED: Added alias
     const updatedUser = await User.findByPk(id, {
         attributes: { exclude: ["password"] },
-        include: [{ model: Role, attributes: ["name"] }]
+        include: [{ 
+          model: Role, 
+          as: 'role', // FIXED: Added alias
+          attributes: ["name"] 
+        }]
     });
 
     res.json(updatedUser);
@@ -193,6 +212,7 @@ exports.updateUser = async (req, res) => {
   }
 };
 
+
 // Delete user (Admin only - soft delete by setting isActive=false)
 exports.deleteUser = async (req, res) => {
   const { id } = req.params;
@@ -205,8 +225,15 @@ exports.deleteUser = async (req, res) => {
     // Soft delete
     user.isActive = false;
     await user.save();
-    // Also deactivate associated therapist profile if exists
-    const therapist = await Therapist.findOne({ where: { userId: id } });
+    
+    // Also deactivate associated therapist profile - FIXED: Added alias
+    const therapist = await Therapist.findOne({ 
+      where: { userId: id },
+      include: [{ 
+        model: User, 
+        as: 'user' // FIXED: Added alias
+      }]
+    });
     if (therapist) {
         therapist.isActive = false;
         await therapist.save();
@@ -224,14 +251,16 @@ exports.deleteUser = async (req, res) => {
 // Get current user's profile
 exports.getCurrentUserProfile = async (req, res) => {
   try {
-    // req.user.id is set by the authenticateToken middleware
     const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ["password"] }, // Exclude password
-      include: [{ model: Role, attributes: ["name"] }], // Include role name
+      attributes: { exclude: ["password"] },
+      include: [{ 
+        model: Role, 
+        as: 'role', // FIXED: Added alias
+        attributes: ["name"] 
+      }],
     });
 
     if (!user) {
-      // This shouldn't happen if the token is valid, but handle defensively
       return res.status(404).json({ message: "User profile not found." });
     }
 
@@ -269,10 +298,14 @@ exports.updateCurrentUserProfile = async (req, res) => {
 
     await user.save();
 
-    // Fetch updated user data to return (excluding password)
+    // Fetch updated user data - FIXED: Added alias
     const updatedUser = await User.findByPk(userId, {
         attributes: { exclude: ["password"] },
-        include: [{ model: Role, attributes: ["name"] }]
+        include: [{ 
+          model: Role, 
+          as: 'role', // FIXED: Added alias
+          attributes: ["name"] 
+        }]
     });
 
     res.json(updatedUser);

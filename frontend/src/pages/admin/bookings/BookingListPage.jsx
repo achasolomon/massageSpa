@@ -84,6 +84,50 @@ const getPaymentMethodIcon = (method) => {
     }
 };
 
+// Helper function to format booking data
+const formatBookingData = (booking) => ({
+    ...booking,
+    // Client information
+    clientName: booking.Client ? `${booking.Client.firstName || ''} ${booking.Client.lastName || ''}`.trim() : 'N/A',
+    clientEmail: booking.Client?.email || 'N/A',
+    clientId: booking.Client?.id || null,
+
+    // Service information
+    serviceName: booking.ServiceOption?.Service?.name || 'N/A',
+    serviceId: booking.ServiceOption?.Service?.id || null,
+    optionName: booking.ServiceOption?.optionName || 'Standard Session',
+    duration: booking.ServiceOption?.duration || 0,
+    originalPrice: booking.ServiceOption?.price || '0.00',
+
+    // Therapist information
+    therapistName: booking.Therapist ?
+        `${booking.Therapist.User?.firstName || ''} ${booking.Therapist.User?.lastName || ''}`.trim() : 'Not Assigned',
+    therapistId: booking.Therapist?.id || null,
+
+    // Booking timing
+    bookingDate: format(parseISO(booking.bookingStartTime), 'yyyy-MM-dd'),
+    bookingTime: format(parseISO(booking.bookingStartTime), 'HH:mm'),
+    endTime: format(parseISO(booking.bookingEndTime), 'HH:mm'),
+    dateTime: parseISO(booking.bookingStartTime),
+
+    // Pricing
+    price: booking.priceAtBooking || booking.ServiceOption?.price || '0.00',
+
+    // Payment and status
+    paymentMethod: booking.paymentMethod || 'Not Specified',
+    paymentStatus: booking.paymentStatus || 'Pending',
+
+    // Notes
+    clientNotes: booking.clientNotes || '',
+    internalNotes: booking.internalNotes || '',
+
+    // Additional metadata
+    consentFormCompleted: !!booking.consentFormCompletedAt,
+    reminderSent: booking.reminderSent || false,
+    createdAt: booking.createdAt ? format(parseISO(booking.createdAt), 'yyyy-MM-dd HH:mm') : 'N/A',
+    updatedAt: booking.updatedAt ? format(parseISO(booking.updatedAt), 'yyyy-MM-dd HH:mm') : 'N/A'
+});
+
 export default function BookingListPage() {
     const theme = useTheme();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
@@ -111,49 +155,7 @@ export default function BookingListPage() {
             const response = await apiClient.get('/bookings');
             const bookingsArray = response.data?.bookings || response.data || [];
 
-            const formattedBookings = bookingsArray.map(booking => ({
-                ...booking,
-                // Client information
-                clientName: booking.Client ? `${booking.Client.firstName || ''} ${booking.Client.lastName || ''}`.trim() : 'N/A',
-                clientEmail: booking.Client?.email || 'N/A',
-                clientId: booking.Client?.id || null,
-
-                // Service information
-                serviceName: booking.ServiceOption?.Service?.name || 'N/A',
-                serviceId: booking.ServiceOption?.Service?.id || null,
-                optionName: booking.ServiceOption?.optionName || 'Standard Session',
-                duration: booking.ServiceOption?.duration || 0,
-                originalPrice: booking.ServiceOption?.price || '0.00',
-
-                // Therapist information
-                therapistName: booking.Therapist ?
-                    `${booking.Therapist.User?.firstName || ''} ${booking.Therapist.User?.lastName || ''}`.trim() : 'Not Assigned',
-                therapistId: booking.Therapist?.id || null,
-
-                // Booking timing
-                bookingDate: format(parseISO(booking.bookingStartTime), 'yyyy-MM-dd'),
-                bookingTime: format(parseISO(booking.bookingStartTime), 'HH:mm'),
-                endTime: format(parseISO(booking.bookingEndTime), 'HH:mm'),
-                dateTime: parseISO(booking.bookingStartTime),
-
-                // Pricing
-                price: booking.priceAtBooking || booking.ServiceOption?.price || '0.00',
-
-                // Payment and status
-                paymentMethod: booking.paymentMethod || 'Not Specified',
-                paymentStatus: booking.paymentStatus || 'Pending',
-
-                // Notes
-                clientNotes: booking.clientNotes || '',
-                internalNotes: booking.internalNotes || '',
-
-                // Additional metadata
-                consentFormCompleted: !!booking.consentFormCompletedAt,
-                reminderSent: booking.reminderSent || false,
-                createdAt: booking.createdAt ? format(parseISO(booking.createdAt), 'yyyy-MM-dd HH:mm') : 'N/A',
-                updatedAt: booking.updatedAt ? format(parseISO(booking.updatedAt), 'yyyy-MM-dd HH:mm') : 'N/A'
-            }));
-
+            const formattedBookings = bookingsArray.map(formatBookingData);
             setBookings(formattedBookings.sort((a, b) => b.dateTime - a.dateTime));
         } catch (err) {
             console.error("Error fetching bookings:", err);
@@ -186,11 +188,30 @@ export default function BookingListPage() {
         setEditModalOpen(true);
     };
 
-    const handleSaveBooking = (updatedBooking) => {
-        setBookings(prev =>
-            prev.map(b => b.id === updatedBooking.id ? updatedBooking : b)
-        );
-    }
+    const handleSaveBooking = async (updatedBookingData) => {
+        try {
+            // Fetch the updated booking from the server to ensure we have the latest data
+            const response = await apiClient.get(`/bookings/${updatedBookingData.id || updatedBookingData.bookingId}`);
+            const updatedBooking = formatBookingData(response.data);
+            
+            setBookings(prev =>
+                prev.map(b => b.id === updatedBooking.id ? updatedBooking : b)
+            );
+            
+            // If this booking is currently selected for viewing, update it too
+            if (selectedBooking && selectedBooking.id === updatedBooking.id) {
+                setSelectedBooking(updatedBooking);
+            }
+            
+            setEditModalOpen(false);
+            setCurrentBooking(null);
+        } catch (err) {
+            console.error("Error fetching updated booking:", err);
+            // Fallback: refresh all bookings
+            fetchBookings();
+        }
+    };
+
     const toggleRowExpand = (id) => {
         setExpandedRows(prev =>
             prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]
@@ -202,10 +223,6 @@ export default function BookingListPage() {
         setViewModalOpen(true);
     };
 
-    // const handleEditBooking = (id) => {
-    //     navigate(`/admin/bookings/edit/${id}`);
-    // };
-
     const handleCancelBooking = (booking) => {
         setSelectedBooking(booking);
         setDeleteModalOpen(true);
@@ -216,8 +233,9 @@ export default function BookingListPage() {
 
         try {
             await apiClient.delete(`/bookings/${selectedBooking.id}`);
-            fetchBookings();
+            fetchBookings(); // Refresh the entire list
             setDeleteModalOpen(false);
+            setSelectedBooking(null);
         } catch (err) {
             console.error("Error cancelling booking:", err);
             setError(err.response?.data?.message || "Failed to cancel booking.");
@@ -281,7 +299,7 @@ export default function BookingListPage() {
                         <MenuItem value="completed">Completed</MenuItem>
                     </Select>
                 </FormControl>
-                {user?.role !== 'therapist' && (
+                {/* {user?.role !== 'therapist' && (
                     <Button
                         variant="contained"
                         startIcon={<Add />}
@@ -289,7 +307,7 @@ export default function BookingListPage() {
                     >
                         New Booking
                     </Button>
-                )}
+                )} */}
             </Stack>
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -591,7 +609,7 @@ export default function BookingListPage() {
                         variant="contained"
                         onClick={() => {
                             setViewModalOpen(false);
-                            handleEditBooking(selectedBooking.id);
+                            handleEditBooking(selectedBooking);
                         }}
                     >
                         Edit Booking
@@ -645,9 +663,13 @@ export default function BookingListPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+            
             <BookingEditModal
                 open={editModalOpen}
-                onClose={() => setEditModalOpen(false)}
+                onClose={() => {
+                    setEditModalOpen(false);
+                    setCurrentBooking(null);
+                }}
                 booking={currentBooking}
                 onSave={handleSaveBooking}
                 therapists={therapists || []}

@@ -2,41 +2,42 @@ const { Therapist, User, Service, Schedule, Booking, Client, TherapistServices, 
 const { Op } = require("sequelize");
 
 // Get active therapists (public)
-// Renamed from getActiveTherapists to match therapistRoutes.js
 exports.getPublicTherapists = async (req, res) => {
-  const { serviceId } = req.query;
-  const whereClause = { isActive: true };
-  const includeOptions = [
-    {
-      model: User,
-      where: { isActive: true }, // Ensure associated user is also active
-      attributes: ["firstName", "lastName"], // Only include necessary user fields
-    },
-  ];
+    const { serviceId } = req.query;
+    const whereClause = { isActive: true };
+    const includeOptions = [
+        {
+            model: User,
+            as: 'user',
+            where: { isActive: true },
+            attributes: ["firstName", "lastName"]
+        },
+    ];
 
-  // If filtering by serviceId, adjust the include options
-  if (serviceId) {
-    includeOptions.push({
-      model: Service,
-      where: { id: serviceId, isActive: true },
-      attributes: [], // No need for service attributes here, just filtering
-      through: { attributes: [] },
-      required: true, // Make this include mandatory for filtering
-    });
-  }
+    // If filtering by serviceId, adjust the include options
+    if (serviceId) {
+        includeOptions.push({
+            model: Service,
+            as: 'services',
+            where: { id: serviceId, isActive: true },
+            attributes: [],
+            through: { attributes: [] },
+            required: true
+        });
+    }
 
-  try {
-    const therapists = await Therapist.findAll({
-      where: whereClause,
-      include: includeOptions,
-      attributes: ["id", "bio", "specialties", "profilePictureUrl"], // Publicly relevant fields
-      order: [ [User, "lastName", "ASC"], [User, "firstName", "ASC"] ]
-    });
-    res.json(therapists);
-  } catch (error) {
-    console.error("Error fetching public therapists:", error);
-    res.status(500).json({ message: "Server error while fetching therapists." });
-  }
+    try {
+        const therapists = await Therapist.findAll({
+            where: whereClause,
+            include: includeOptions,
+            attributes: ["id", "bio", "specialties", "profilePictureUrl"],
+            order: [[{ model: User, as: 'user' }, "lastName", "ASC"], [{ model: User, as: 'user' }, "firstName", "ASC"]] // FIXED: Added alias in order clause
+        });
+        res.json(therapists);
+    } catch (error) {
+        console.error("Error fetching public therapists:", error);
+        res.status(500).json({ message: "Server error while fetching therapists." });
+    }
 };
 
 // Get public profile of a specific therapist
@@ -48,11 +49,13 @@ exports.getPublicTherapistProfile = async (req, res) => {
             include: [
                 {
                     model: User,
+                    as: 'user', // FIXED: Added alias
                     where: { isActive: true },
                     attributes: ["firstName", "lastName"]
                 },
                 {
                     model: Service,
+                    as: 'services', // FIXED: Added alias (plural for many-to-many)
                     where: { isActive: true },
                     attributes: ["id", "name"],
                     through: { attributes: [] }
@@ -76,130 +79,165 @@ exports.getPublicTherapistProfile = async (req, res) => {
 
 // Get all therapists (Admin)
 exports.getAllTherapists = async (req, res) => {
-  const { page = 1, limit = 10, isActive, serviceId } = req.query;
-  const offset = (page - 1) * limit;
-  const whereClause = {};
-  const includeOptions = [
-    { model: User, attributes: { exclude: ["password"] } }, // Include full user details (except password)
-    { model: Service, attributes: ["id", "name"], through: { attributes: [] } }
-  ];
+    const { page = 1, limit = 10, isActive, serviceId } = req.query;
+    const offset = (page - 1) * limit;
+    const whereClause = {};
+    const includeOptions = [
+        {
+            model: User,
+            as: 'user', // FIXED: Added alias
+            attributes: { exclude: ["password"] }
+        },
+        {
+            model: Service,
+            as: 'services', // FIXED: Added alias (plural for many-to-many)
+            attributes: ["id", "name"],
+            through: { attributes: [] }
+        }
+    ];
 
-  if (isActive !== undefined) {
-    whereClause.isActive = isActive === 'true';
-  }
-
-  // If filtering by serviceId, adjust the include options
-  if (serviceId) {
-    // Find the Service include option or add it if not present
-    let serviceInclude = includeOptions.find(inc => inc.model === Service);
-    if (!serviceInclude) {
-        serviceInclude = { model: Service, attributes: ["id", "name"], through: { attributes: [] } };
-        includeOptions.push(serviceInclude);
+    if (isActive !== undefined) {
+        whereClause.isActive = isActive === 'true';
     }
-    serviceInclude.where = { id: serviceId };
-    serviceInclude.required = true; // Make the join required
-  }
 
-  try {
-    const { count, rows } = await Therapist.findAndCountAll({
-      where: whereClause,
-      include: includeOptions,
-      order: [ [User, "lastName", "ASC"], [User, "firstName", "ASC"] ],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      distinct: true, // Important for correct count with includes
-    });
+    // If filtering by serviceId, adjust the include options
+    if (serviceId) {
+        // Find the Service include option or add it if not present
+        let serviceInclude = includeOptions.find(inc => inc.model === Service);
+        if (!serviceInclude) {
+            serviceInclude = {
+                model: Service,
+                as: 'services', // FIXED: Added alias
+                attributes: ["id", "name"],
+                through: { attributes: [] }
+            };
+            includeOptions.push(serviceInclude);
+        }
+        serviceInclude.where = { id: serviceId };
+        serviceInclude.required = true;
+    }
 
-     res.json({
-      totalTherapists: count,
-      totalPages: Math.ceil(count / limit),
-      currentPage: parseInt(page),
-      therapists: rows,
-    });
+    try {
+        const { count, rows } = await Therapist.findAndCountAll({
+            where: whereClause,
+            include: includeOptions,
+            order: [[{ model: User, as: 'user' }, "lastName", "ASC"], [{ model: User, as: 'user' }, "firstName", "ASC"]], // FIXED: Added alias in order clause
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            distinct: true,
+        });
 
-  } catch (error) {
-    console.error("Error fetching all therapists:", error);
-    res.status(500).json({ message: "Server error while fetching therapists." });
-  }
+        res.json({
+            totalTherapists: count,
+            totalPages: Math.ceil(count / limit),
+            currentPage: parseInt(page),
+            therapists: rows,
+        });
+
+    } catch (error) {
+        console.error("Error fetching all therapists:", error);
+        res.status(500).json({ message: "Server error while fetching therapists." });
+    }
 };
 
 // Create a new therapist profile (Admin)
 exports.createTherapist = async (req, res) => {
-  const { userId, bio, specialties, yearsOfExperience, profilePictureUrl, serviceIds } = req.body;
+    const { userId, bio, specialties, yearsOfExperience, profilePictureUrl, serviceIds } = req.body;
 
-  if (!userId) {
-    return res.status(400).json({ message: "User ID is required to create a therapist profile." });
-  }
-
-  const transaction = await sequelize.transaction();
-  try {
-    // Check if user exists and is not already a therapist
-    const user = await User.findByPk(userId, { include: Role });
-    if (!user) {
-      await transaction.rollback();
-      return res.status(404).json({ message: "User not found." });
+    if (!userId) {
+        return res.status(400).json({ message: "User ID is required to create a therapist profile." });
     }
-    // Ensure the user has the 'Therapist' role (or assign it if needed/allowed)
-    if (user.Role.name !== 'therapist') {
-        // Optional: Automatically assign Therapist role if user exists but has wrong role?
-        // Or just return an error.
+
+    const transaction = await sequelize.transaction();
+    try {
+        // Check if user exists and is not already a therapist - FIXED: Added alias
+        const user = await User.findByPk(userId, {
+            include: [{
+                model: Role,
+                as: 'role' // FIXED: Added alias
+            }]
+        });
+        if (!user) {
+            await transaction.rollback();
+            return res.status(404).json({ message: "User not found." });
+        }
+        // Ensure the user has the 'Therapist' role - FIXED: Updated property access
+        if (user.role.name !== 'therapist') {
+            await transaction.rollback();
+            return res.status(400).json({ message: `User with ID ${userId} does not have the 'Therapist' role.` });
+        }
+
+        const existingTherapist = await Therapist.findOne({ where: { userId } });
+        if (existingTherapist) {
+            await transaction.rollback();
+            return res.status(400).json({ message: "This user already has a therapist profile." });
+        }
+
+        // Create therapist profile
+        const newTherapist = await Therapist.create({
+            userId,
+            bio,
+            specialties,
+            yearsOfExperience,
+            profilePictureUrl,
+            isActive: true,
+        }, { transaction });
+
+        // Assign services if provided - FIXED: Use alias
+        if (serviceIds && serviceIds.length > 0) {
+            const services = await Service.findAll({ where: { id: { [Op.in]: serviceIds } } });
+            if (services.length !== serviceIds.length) {
+                await transaction.rollback();
+                return res.status(400).json({ message: "One or more provided service IDs are invalid." });
+            }
+            await newTherapist.setServices(services, { transaction }); // This uses the alias automatically
+        }
+
+        await transaction.commit();
+
+        // Fetch the created therapist with associations - FIXED: Added aliases
+        const result = await Therapist.findByPk(newTherapist.id, {
+            include: [
+                {
+                    model: User,
+                    as: 'user', // FIXED: Added alias
+                    attributes: { exclude: ["password"] }
+                },
+                {
+                    model: Service,
+                    as: 'services', // FIXED: Added alias
+                    attributes: ["id", "name"],
+                    through: { attributes: [] }
+                }
+            ]
+        });
+
+        res.status(201).json(result);
+
+    } catch (error) {
         await transaction.rollback();
-        return res.status(400).json({ message: `User with ID ${userId} does not have the 'Therapist' role.` });
+        console.error("Error creating therapist:", error);
+        res.status(500).json({ message: "Server error while creating therapist profile." });
     }
-
-    const existingTherapist = await Therapist.findOne({ where: { userId } });
-    if (existingTherapist) {
-      await transaction.rollback();
-      return res.status(400).json({ message: "This user already has a therapist profile." });
-    }
-
-    // Create therapist profile
-    const newTherapist = await Therapist.create({
-      userId,
-      bio,
-      specialties,
-      yearsOfExperience,
-      profilePictureUrl,
-      isActive: true, // Active by default
-    }, { transaction });
-
-    // Assign services if provided
-    if (serviceIds && serviceIds.length > 0) {
-      const services = await Service.findAll({ where: { id: { [Op.in]: serviceIds } } });
-      if (services.length !== serviceIds.length) {
-          await transaction.rollback();
-          return res.status(400).json({ message: "One or more provided service IDs are invalid." });
-      }
-      await newTherapist.setServices(services, { transaction });
-    }
-
-    await transaction.commit();
-
-    // Fetch the created therapist with associations to return
-    const result = await Therapist.findByPk(newTherapist.id, {
-        include: [
-            { model: User, attributes: { exclude: ["password"] } },
-            { model: Service, attributes: ["id", "name"], through: { attributes: [] } }
-        ]
-    });
-
-    res.status(201).json(result);
-
-  } catch (error) {
-    await transaction.rollback();
-    console.error("Error creating therapist:", error);
-    res.status(500).json({ message: "Server error while creating therapist profile." });
-  }
 };
 
-// Get therapist by ID (Admin)
+// getTherapistById method (Admin)
 exports.getTherapistById = async (req, res) => {
     const { id } = req.params;
     try {
         const therapist = await Therapist.findByPk(id, {
             include: [
-                { model: User, attributes: { exclude: ["password"] } },
-                { model: Service, attributes: ["id", "name"], through: { attributes: [] } }
+                {
+                    model: User,
+                    as: 'user', // FIXED: Added alias
+                    attributes: { exclude: ["password"] }
+                },
+                {
+                    model: Service,
+                    as: 'services', // FIXED: Added alias
+                    attributes: ["id", "name"],
+                    through: { attributes: [] }
+                }
             ]
         });
         if (!therapist) {
@@ -211,6 +249,7 @@ exports.getTherapistById = async (req, res) => {
         res.status(500).json({ message: "Server error while fetching therapist." });
     }
 };
+
 
 // Update therapist profile (Admin)
 exports.updateTherapist = async (req, res) => {
@@ -227,14 +266,14 @@ exports.updateTherapist = async (req, res) => {
 
         // Update fields
         if (bio !== undefined) therapist.bio = bio;
-        if (specialties !== undefined) therapist.specialties = specialties; // Assuming array
+        if (specialties !== undefined) therapist.specialties = specialties;
         if (yearsOfExperience !== undefined) therapist.yearsOfExperience = yearsOfExperience;
         if (profilePictureUrl !== undefined) therapist.profilePictureUrl = profilePictureUrl;
         if (typeof isActive === "boolean") therapist.isActive = isActive;
 
         await therapist.save({ transaction });
 
-        // Update services if provided
+        // Update services if provided - uses alias automatically
         if (serviceIds && Array.isArray(serviceIds)) {
             const services = await Service.findAll({ where: { id: { [Op.in]: serviceIds } } });
             if (services.length !== serviceIds.length) {
@@ -255,11 +294,20 @@ exports.updateTherapist = async (req, res) => {
 
         await transaction.commit();
 
-        // Fetch updated data
+        // Fetch updated data - FIXED: Added aliases
         const updatedTherapist = await Therapist.findByPk(id, {
-             include: [
-                { model: User, attributes: { exclude: ["password"] } },
-                { model: Service, attributes: ["id", "name"], through: { attributes: [] } }
+            include: [
+                {
+                    model: User,
+                    as: 'user', // FIXED: Added alias
+                    attributes: { exclude: ["password"] }
+                },
+                {
+                    model: Service,
+                    as: 'services', // FIXED: Added alias
+                    attributes: ["id", "name"],
+                    through: { attributes: [] }
+                }
             ]
         });
 
@@ -308,7 +356,7 @@ exports.deleteTherapist = async (req, res) => {
 // This logic is now integrated into updateTherapist, but keeping the separate function signature if needed elsewhere
 exports.updateTherapistServices = async (req, res) => {
     const { id } = req.params;
-    const { serviceIds } = req.body; // Expecting an array of service IDs
+    const { serviceIds } = req.body;
 
     if (!Array.isArray(serviceIds)) {
         return res.status(400).json({ message: "serviceIds must be an array." });
@@ -329,16 +377,25 @@ exports.updateTherapistServices = async (req, res) => {
             return res.status(400).json({ message: "One or more provided service IDs are invalid." });
         }
 
-        // Set the therapist's services (this replaces existing associations)
+        // Set the therapist's services - uses alias automatically
         await therapist.setServices(services, { transaction });
 
         await transaction.commit();
 
-        // Fetch updated data
+        // Fetch updated data - FIXED: Added aliases
         const updatedTherapist = await Therapist.findByPk(id, {
-             include: [
-                { model: User, attributes: { exclude: ["password"] } },
-                { model: Service, attributes: ["id", "name"], through: { attributes: [] } }
+            include: [
+                {
+                    model: User,
+                    as: 'user', // FIXED: Added alias
+                    attributes: { exclude: ["password"] }
+                },
+                {
+                    model: Service,
+                    as: 'services', // FIXED: Added alias
+                    attributes: ["id", "name"],
+                    through: { attributes: [] }
+                }
             ]
         });
 
@@ -355,17 +412,27 @@ exports.updateTherapistServices = async (req, res) => {
 
 // Get own schedule (Therapist)
 exports.getMySchedule = async (req, res) => {
-    // req.user.id is set by authenticateToken middleware
     const userId = req.user.id;
     try {
-        const therapist = await Therapist.findOne({ where: { userId: userId } });
+        const therapist = await Therapist.findOne({
+            where: { userId: userId },
+            include: [{
+                model: User,
+                as: 'user' // FIXED: Added alias
+            }]
+        });
         if (!therapist) {
             return res.status(404).json({ message: "Therapist profile not found for the current user." });
         }
 
-        // TODO: Fetch actual schedule data (e.g., from Schedule model)
-        // For now, return a placeholder
-        const scheduleData = await Schedule.findAll({ where: { therapistId: therapist.id } });
+        // Fetch actual schedule data - FIXED: Added alias
+        const scheduleData = await Schedule.findAll({
+            where: { therapistId: therapist.id },
+            include: [{
+                model: Therapist,
+                as: 'therapist' // FIXED: Added alias
+            }]
+        });
 
         res.json({ message: "Therapist schedule endpoint - placeholder", schedule: scheduleData });
     } catch (error) {
@@ -376,13 +443,18 @@ exports.getMySchedule = async (req, res) => {
 
 // Get own assigned bookings (Therapist)
 exports.getMyBookings = async (req, res) => {
-    // req.user.id is set by authenticateToken middleware
     const userId = req.user.id;
     const { status, startDate, endDate } = req.query;
     const whereClause = {};
 
     try {
-        const therapist = await Therapist.findOne({ where: { userId: userId } });
+        const therapist = await Therapist.findOne({
+            where: { userId: userId },
+            include: [{
+                model: User,
+                as: 'user' // FIXED: Added alias
+            }]
+        });
         if (!therapist) {
             return res.status(404).json({ message: "Therapist profile not found for the current user." });
         }
@@ -401,12 +473,25 @@ exports.getMyBookings = async (req, res) => {
             };
         }
 
-        // Fetch bookings assigned to this therapist
+        // Fetch bookings assigned to this therapist - FIXED: Added aliases
         const bookings = await Booking.findAll({
             where: whereClause,
             include: [
-                { model: Client, attributes: ["id", "firstName", "lastName", "email", "phone"] },
-                { model: Service, attributes: ["id", "name", "duration"] }
+                {
+                    model: Client,
+                    as: 'client', // FIXED: Added alias
+                    attributes: ["id", "firstName", "lastName", "email", "phone"]
+                },
+                {
+                    model: ServiceOption,
+                    as: 'serviceOption', // FIXED: Added alias
+                    attributes: ["id", "duration", "price"],
+                    include: [{
+                        model: Service,
+                        as: 'service', // FIXED: Added alias
+                        attributes: ["id", "name"]
+                    }]
+                }
             ],
             order: [["bookingStartTime", "ASC"]]
         });

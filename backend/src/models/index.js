@@ -15,171 +15,184 @@ const Payment = require("./Payment");
 const ClinicalNote = require("./ClinicalNote");
 const ConsentForm = require("./ConsentForm");
 const AnatomicalMarking = require("./AnatomicalMarking");
-const Settings = require("./Settings")
+const Settings = require("./Settings");
 
 // --- Define Associations ---
 
-// User <-> Role (One-to-Many)
+// User <-> Role (Many-to-One)
 Role.hasMany(User, { 
-  foreignKey: {
-    name: "roleId",
-    allowNull: false // MySQL often prefers explicit nullability
-  } 
+  foreignKey: "roleId",
+  as: "users"
 });
 User.belongsTo(Role, { 
-  foreignKey: "roleId" 
+  foreignKey: "roleId",
+  as: "role"
 });
 
-// Therapist <-> User (One-to-One)
+// User <-> Therapist (One-to-One)
 User.hasOne(Therapist, { 
-  foreignKey: {
-    name: "userId",
-    onDelete: "CASCADE"
-  } 
+  foreignKey: "userId",
+  as: "therapistProfile",
+  onDelete: "CASCADE"
 });
 Therapist.belongsTo(User, { 
-  foreignKey: "userId" 
+  foreignKey: "userId",
+  as: "user"
 });
 
-// Client <-> User (One-to-One, Optional)
+// User <-> Client (One-to-One, Optional)
 User.hasOne(Client, { 
-  foreignKey: {
-    name: 'userId',
-    onDelete: 'SET NULL'
-  },
-  constraints: false // Important for MySQL with SET NULL
+  foreignKey: "userId",
+  as: "clientProfile",
+  onDelete: "SET NULL",
+  constraints: false
 });
 Client.belongsTo(User, { 
-  foreignKey: 'userId',
+  foreignKey: "userId",
+  as: "user",
   constraints: false 
 });
 
 // Service <-> ServiceOption (One-to-Many)
 Service.hasMany(ServiceOption, { 
-  foreignKey: {
-    name: "serviceId",
-    onDelete: "CASCADE"
-  } 
+  foreignKey: "serviceId",
+  as: "options",
+  onDelete: "CASCADE"
 });
 ServiceOption.belongsTo(Service, { 
-  foreignKey: "serviceId" 
+  foreignKey: "serviceId",
+  as: "service"
 });
 
 // Service <-> ServiceAvailability (One-to-Many)
 Service.hasMany(ServiceAvailability, { 
-  foreignKey: {
-    name: "serviceId",
-    onDelete: "CASCADE"
-  } 
+  foreignKey: "serviceId",
+  as: "availabilities",
+  onDelete: "CASCADE"
 });
 ServiceAvailability.belongsTo(Service, { 
-  foreignKey: "serviceId" 
+  foreignKey: "serviceId",
+  as: "service"
+});
+
+// ServiceOption <-> ServiceAvailability (One-to-Many)
+ServiceOption.hasMany(ServiceAvailability, { 
+  foreignKey: "serviceOptionId",
+  as: "availabilities"
+});
+ServiceAvailability.belongsTo(ServiceOption, { 
+  foreignKey: "serviceOptionId",
+  as: "serviceOption"
 });
 
 // Therapist <-> ServiceAvailability (One-to-Many, optional)
 Therapist.hasMany(ServiceAvailability, { 
-  foreignKey: {
-    name: "therapistId",
-    onDelete: "CASCADE"
-  } 
+  foreignKey: "therapistId",
+  as: "availabilities",
+  onDelete: "CASCADE"
 });
 ServiceAvailability.belongsTo(Therapist, { 
-  foreignKey: {
-    name: "therapistId",
-    allowNull: true
-  } 
+  foreignKey: "therapistId",
+  as: "therapist"
 });
 
-// Booking <-> Client (Many-to-One)
+// Client <-> Booking (One-to-Many)
 Client.hasMany(Booking, { 
-  foreignKey: "clientId" 
+  foreignKey: "clientId",
+  as: "bookings"
 });
 Booking.belongsTo(Client, { 
-  foreignKey: "clientId" 
+  foreignKey: "clientId",
+  as: "client"
 });
 
-// Booking <-> ServiceOption (Many-to-One)
-ServiceOption.hasMany(Booking, { 
-  foreignKey: "serviceOptionId" 
-});
-
-Booking.belongsTo(ServiceOption, { 
-  foreignKey: "serviceOptionId" 
-});
-
-// Booking <-> Service (Many-to-One)
-Service.hasMany(Booking, { 
-  foreignKey: "serviceId" 
-});
-Booking.belongsTo(Service, { 
-  foreignKey: "serviceId" 
-});
-
-// Booking <-> Therapist (Many-to-One)
+// Therapist <-> Booking (One-to-Many)
 Therapist.hasMany(Booking, { 
-  foreignKey: "therapistId" 
+  foreignKey: "therapistId",
+  as: "bookings"
 });
 Booking.belongsTo(Therapist, { 
-  foreignKey: {
-    name: "therapistId",
-    allowNull: true
-  } 
+  foreignKey: "therapistId",
+  as: "therapist"
+});
+
+// ServiceOption <-> Booking (One-to-Many)
+ServiceOption.hasMany(Booking, { 
+  foreignKey: "serviceOptionId",
+  as: "bookings"
+});
+Booking.belongsTo(ServiceOption, { 
+  foreignKey: "serviceOptionId",
+  as: "serviceOption"
+});
+
+// User <-> Booking (for noShowMarkedBy)
+User.hasMany(Booking, {
+  foreignKey: "noShowMarkedBy",
+  as: "markedNoShowBookings"
+});
+Booking.belongsTo(User, {
+  foreignKey: "noShowMarkedBy",
+  as: "noShowMarkedByUser"
 });
 
 // Booking <-> Payment (One-to-One)
 Booking.hasOne(Payment, { 
-  foreignKey: {
-    name: "bookingId",
-    onDelete: "CASCADE"
-  } 
+  foreignKey: "bookingId",
+  as: "payment",
+  onDelete: "CASCADE"
 });
 Payment.belongsTo(Booking, { 
-  foreignKey: "bookingId" 
+  foreignKey: "bookingId",
+  as: "booking"
 });
 
 // Booking <-> ClinicalNote (One-to-One)
 Booking.hasOne(ClinicalNote, { 
-  foreignKey: {
-    name: "bookingId",
-    onDelete: "CASCADE"
-  } 
+  foreignKey: "bookingId",
+  as: "clinicalNote",
+  onDelete: "CASCADE"
 });
 ClinicalNote.belongsTo(Booking, { 
-  foreignKey: "bookingId" 
+  foreignKey: "bookingId",
+  as: "booking"
 });
 
-// ClinicalNote <-> Client (Many-to-One)
+// Client <-> ClinicalNote (One-to-Many)
 Client.hasMany(ClinicalNote, { 
-  foreignKey: "clientId" 
+  foreignKey: "clientId",
+  as: "clinicalNotes"
 });
 ClinicalNote.belongsTo(Client, { 
-  foreignKey: "clientId" 
+  foreignKey: "clientId",
+  as: "client"
 });
 
-// ClinicalNote <-> Therapist (Many-to-One)
+// Therapist <-> ClinicalNote (One-to-Many)
 Therapist.hasMany(ClinicalNote, { 
-  foreignKey: "therapistId" 
+  foreignKey: "therapistId",
+  as: "clinicalNotes"
 });
 ClinicalNote.belongsTo(Therapist, { 
-  foreignKey: "therapistId" 
+  foreignKey: "therapistId",
+  as: "therapist"
 });
 
 // Therapist <-> Schedule (One-to-Many)
 Therapist.hasMany(Schedule, { 
-  foreignKey: {
-    name: "therapistId",
-    onDelete: "CASCADE"
-  } 
+  foreignKey: "therapistId",
+  as: "schedules",
+  onDelete: "CASCADE"
 });
 Schedule.belongsTo(Therapist, { 
-  foreignKey: "therapistId" 
+  foreignKey: "therapistId",
+  as: "therapist"
 });
 
-// Therapist <-> Service (Many-to-Many)
+// Therapist <-> Service (Many-to-Many) - FIXED UUID ISSUE
 const TherapistServices = sequelize.define("TherapistServices", {
-  // Explicitly define columns for MySQL compatibility
   therapistId: {
-    type: Sequelize.INTEGER,
+    type: Sequelize.UUID, // Changed from INTEGER to UUID
     primaryKey: true,
     references: {
       model: 'Therapists',
@@ -187,7 +200,7 @@ const TherapistServices = sequelize.define("TherapistServices", {
     }
   },
   serviceId: {
-    type: Sequelize.INTEGER,
+    type: Sequelize.UUID, // Changed from INTEGER to UUID
     primaryKey: true,
     references: {
       model: 'Services',
@@ -196,60 +209,53 @@ const TherapistServices = sequelize.define("TherapistServices", {
   }
 }, { 
   timestamps: false,
-  tableName: 'therapist_services' // MySQL prefers snake_case for table names
+  tableName: 'therapist_services'
 });
 
 Therapist.belongsToMany(Service, { 
   through: TherapistServices,
   foreignKey: 'therapistId',
-  otherKey: 'serviceId'
+  otherKey: 'serviceId',
+  as: 'services'
 });
 Service.belongsToMany(Therapist, { 
   through: TherapistServices,
   foreignKey: 'serviceId',
-  otherKey: 'therapistId'
+  otherKey: 'therapistId',
+  as: 'therapists'
 });
 
-// ConsentForm <-> Booking (One-to-One)
+// Booking <-> ConsentForm (One-to-One)
 Booking.hasOne(ConsentForm, { 
-  foreignKey: {
-    name: "bookingId",
-    onDelete: "CASCADE"
-  },
-  as: "consentForm" 
+  foreignKey: "bookingId",
+  as: "consentForm",
+  onDelete: "CASCADE"
 });
 ConsentForm.belongsTo(Booking, { 
   foreignKey: "bookingId",
-  as: "booking" 
+  as: "booking"
 });
 
-// ServiceAvailability <-> ServiceOption
-ServiceOption.hasMany(ServiceAvailability, { 
-  foreignKey: 'serviceOptionId' 
-});
-ServiceAvailability.belongsTo(ServiceOption, { 
-  foreignKey: 'serviceOptionId' 
-});
-
-// Anatomical Marking associations
+// ClinicalNote <-> AnatomicalMarking (One-to-Many)
 ClinicalNote.hasMany(AnatomicalMarking, { 
-  foreignKey: {
-    name: 'clinicalNoteId',
-    allowNull: false
-  },
-  as: 'anatomicalMarkings' 
+  foreignKey: "clinicalNoteId",
+  as: "anatomicalMarkings",
+  onDelete: "CASCADE"
 });
 AnatomicalMarking.belongsTo(ClinicalNote, { 
-  foreignKey: 'clinicalNoteId',
-  as: 'clinicalNote' 
+  foreignKey: "clinicalNoteId",
+  as: "clinicalNote"
 });
 
-Therapist.belongsTo(User, { foreignKey: 'userId' });
-User.hasOne(Therapist, { foreignKey: 'userId' });
-
-Schedule.belongsTo(Therapist, { foreignKey: 'therapistId' });
-Therapist.hasMany(Schedule, { foreignKey: 'therapistId' });
-
+// ServiceOption <-> Payment (One-to-Many)
+ServiceOption.hasMany(Payment, { 
+  foreignKey: "serviceOptionId",
+  as: "payments"
+});
+Payment.belongsTo(ServiceOption, { 
+  foreignKey: "serviceOptionId",
+  as: "serviceOption"
+});
 
 // --- Export Models and Sequelize Instance ---
 const db = {
